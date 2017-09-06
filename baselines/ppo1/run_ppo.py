@@ -108,18 +108,18 @@ class CustomParallelEnv:
                     obs = np.frombuffer(buf, dtype=np.float32, count=self.numo)
                     return obs
                 else:
-                    ss = np.zeros([self.numo]);
+                    ss = np.zeros([self.numo])
                     off = 0
                     for i in range(self.numo):
                         ss[i] = struct.unpack_from('=f', message, offset=off)[0]
                         off += 4
                     return ss
             else:
-                req = "0";
+                req = "0"
                 # print("** Send")
                 socket.send_string(req)
                 #  Get the reply.
-                ss = np.zeros([self.numo]);
+                ss = np.zeros([self.numo])
                 # print("** Recv")
                 message = socket.recv()
                 vals = message.split()
@@ -187,7 +187,7 @@ class CustomParallelEnv:
                 # print("** Done send")
 
                 #  Get the reply.
-                ss = np.zeros([self.numo]);
+                ss = np.zeros([self.numo])
                 # print("Wait for reply")
                 # print("** Recv")
                 message = socket.recv()
@@ -227,7 +227,7 @@ class CustomParallelEnv:
                     obs = obs.reshape((self.n_parallel, self.numo))
                     return obs
                 else:
-                    ss = np.zeros([self.n_parallel, self.numo]);
+                    ss = np.zeros([self.n_parallel, self.numo])
                     off = 0
                     for k in range(self.n_parallel):
                         for i in range(self.numo):
@@ -238,7 +238,7 @@ class CustomParallelEnv:
             else:
                 self.socket.send_string("0")
                 #  Get the reply.
-                ss = np.zeros([self.n_parallel, self.numo]);
+                ss = np.zeros([self.n_parallel, self.numo])
                 # print("** Recv")
                 message = self.socket.recv()
                 vals = message.split()
@@ -282,7 +282,7 @@ class CustomParallelEnv:
                     # print("Wait for reply")
                     message = self.socket.recv()
 
-                    ss = np.zeros([self.n_parallel, self.numo]);
+                    ss = np.zeros([self.n_parallel, self.numo])
                     r = np.zeros([self.n_parallel])
                     done = [False] * self.n_parallel
                     off = 0
@@ -296,7 +296,7 @@ class CustomParallelEnv:
                         off += 1
                     return ss, r, done, [{}] * self.n_parallel
             else:
-                req = "1";
+                req = "1"
                 for k in range(self.n_parallel):
                     for i in range(self.numa):
                         req += " " + str(actions[k][i])
@@ -331,7 +331,7 @@ def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
     from baselines.ppo1 import mlp_policy, pposgd_parallel
     print("num cpu = " + str(num_cpu))
     if (num_cpu > 1) and (num_parallel > 0):
-        print("num_cpu > 1 and num_parallel > 0 can't be used together!")
+        print("num_cpu > 1 and num_parallel > 0 can't be used together at the moment!")
         exit(0)
 
     whoami  = mpi_fork(num_cpu)

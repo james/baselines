@@ -20,11 +20,13 @@ def train(env_id, num_frames, seed):
     sess = U.single_threaded_session()
     sess.__enter__()
     if rank != 0: logger.set_level(logger.DISABLED)
-    workerseed = seed + 10000 * MPI.COMM_WORLD.Get_rank()
+    workerseed = seed + 10000 * rank
     set_global_seeds(workerseed)
     env = gym.make(env_id)
+
     def policy_fn(name, ob_space, ac_space): #pylint: disable=W0613
         return cnn_policy.CnnPolicy(name=name, ob_space=ob_space, ac_space=ac_space)
+    
     env = bench.Monitor(env, logger.get_dir() and
         osp.join(logger.get_dir(), "%i.monitor.json" % rank))
     env.seed(workerseed)
