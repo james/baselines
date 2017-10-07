@@ -47,15 +47,22 @@ class GaussianMlpPolicy(object):
         # (2) When computing loss functions, for the policy update
         # Variables specific to (1) have the word "sampled" in them,
         # whereas variables specific to (2) have the word "old" in them
-        ob_no = tf.placeholder(tf.float32, shape=[None, ob_dim*2], name="ob") # batch of observations
+        ob_no = tf.placeholder(tf.float32, shape=[None, ob_dim * 2], name="ob") # batch of observations
         oldac_na = tf.placeholder(tf.float32, shape=[None, ac_dim], name="ac") # batch of actions previous actions
-        oldac_dist = tf.placeholder(tf.float32, shape=[None, ac_dim*2], name="oldac_dist") # batch of actions previous action distributions
+        oldac_dist = tf.placeholder(tf.float32, shape=[None, ac_dim * 2], name="oldac_dist") # batch of actions previous action distributions
         adv_n = tf.placeholder(tf.float32, shape=[None], name="adv") # advantage function estimate
         oldlogprob_n = tf.placeholder(tf.float32, shape=[None], name='oldlogprob') # log probability of previous actions
         wd_dict = {}
-        h1 = tf.nn.tanh(dense(ob_no, 64, "h1", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
-        h2 = tf.nn.tanh(dense(h1, 64, "h2", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+
+  #      h1 = tf.nn.tanh(dense(ob_no, 64, "h1", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+  #      h2 = tf.nn.tanh(dense(h1, 64, "h2", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+
+  #      h1 = tf.nn.elu(dense(ob_no, 400, "h1", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+  #      h2 = tf.nn.elu(dense(h1, 300, "h2", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+        h1 = tf.nn.elu(dense(ob_no, 128, "h1", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+        h2 = tf.nn.elu(dense(h1, 128, "h2", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
         mean_na = dense(h2, ac_dim, "mean", weight_init=U.normc_initializer(0.1), bias_init=0.0, weight_loss_dict=wd_dict) # Mean control output
+
         self.wd_dict = wd_dict
         self.logstd_1a = logstd_1a = tf.get_variable("logstd", [ac_dim], tf.float32, tf.zeros_initializer()) # Variance on outputs
         logstd_1a = tf.expand_dims(logstd_1a, 0)
@@ -66,6 +73,7 @@ class GaussianMlpPolicy(object):
         logprobsampled_n = - U.sum(tf.log(ac_dist[:,ac_dim:]), axis=1) - 0.5 * tf.log(2.0*np.pi)*ac_dim - 0.5 * U.sum(tf.square(ac_dist[:,:ac_dim] - sampled_ac_na) / (tf.square(ac_dist[:,ac_dim:])), axis=1) # Logprob of sampled action
         logprob_n = - U.sum(tf.log(ac_dist[:,ac_dim:]), axis=1) - 0.5 * tf.log(2.0*np.pi)*ac_dim - 0.5 * U.sum(tf.square(ac_dist[:,:ac_dim] - oldac_na) / (tf.square(ac_dist[:,ac_dim:])), axis=1) # Logprob of previous actions under CURRENT policy (whereas oldlogprob_n is under OLD policy)
         kl = U.mean(kl_div(oldac_dist, ac_dist, ac_dim))
+        
         #kl = .5 * U.mean(tf.square(logprob_n - oldlogprob_n)) # Approximation of KL divergence between old policy used to generate actions, and new policy used to compute logprob_n
         surr = - U.mean(adv_n * logprob_n) # Loss function that we'll differentiate to get the policy gradient
         surr_sampled = - U.mean(logprob_n) # Sampled loss of the policy
@@ -78,3 +86,7 @@ class GaussianMlpPolicy(object):
     def act(self, ob):
         ac, ac_dist, logp = self._act(ob[None])
         return ac[0], ac_dist[0], logp[0]
+
+    def act_parallel(self, ob):
+        ac, ac_dist, logp = self._act(ob)
+        return ac, ac_dist, logp

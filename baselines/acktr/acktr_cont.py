@@ -5,6 +5,9 @@ from baselines import common
 from baselines.common import tf_util as U
 from baselines.acktr import kfac
 from baselines.acktr.filters import ZFilter
+import os
+import pickle
+
 
 def pathlength(path):
     return path["reward"].shape[0]# Loss function that we'll differentiate to get the policy gradient
@@ -45,15 +48,28 @@ def rollout(env, policy, max_pathlength, animate=False, obfilter=None):
             "reward" : np.array(rewards), "action" : np.array(acs),
             "action_dist": np.array(ac_dists), "logp" : np.array(logps)}
 
-def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
-    animate=False, callback=None, optimizer="adam", desired_kl=0.002):
+def save(save_path):
+    ps = sess.run(params)
+    make_path(save_path)
+    joblib.dump(ps, save_path)
+
+def load(load_path):
+    loaded_params = joblib.load(load_path)
+    restores = []
+    for p, loaded_p in zip(params, loaded_params):
+        restores.append(p.assign(loaded_p))
+    ps = sess.run(restores)
+
+
+def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, agentName, logdir, num_timesteps,
+    animate=False, callback=None, desired_kl=0.002):
 
     obfilter = ZFilter(env.observation_space.shape)
 
     max_pathlength = env.spec.timestep_limit
     stepsize = tf.Variable(initial_value=np.float32(np.array(0.03)), name='stepsize')
     inputs, loss, loss_sampled = policy.update_info
-    optim = kfac.KfacOptimizer(learning_rate=stepsize, cold_lr=stepsize*(1-0.9), momentum=0.9, kfac_update=2,\
+    optim = kfac.KfacOptimizer(learning_rate=stepsize, cold_lr=stepsize*(1.0 - 0.9), momentum=0.9, kfac_update=2,\
                                 epsilon=1e-2, stats_decay=0.99, async=1, cold_iter=1,
                                 weight_decay_dict=policy.wd_dict, max_grad_norm=None)
     pi_var_list = []
@@ -72,18 +88,26 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
         assert (qr != None)
         enqueue_threads.extend(qr.create_threads(U.get_session(), coord=coord, start=True))
 
-    i = 0
     timesteps_so_far = 0
+    saver = tf.train.Saver()
+    if resume > 0:
+        saver.restore(tf.get_default_session(), os.path.join(os.path.abspath(logdir), "{}-{}".format(agentName, resume)))
+        ob_filter_path = os.path.join(os.path.abspath(logdir), "{}-{}".format('obfilter', resume))
+        with open(ob_filter_path, 'rb') as ob_filter_input:
+            obfilter = pickle.load(ob_filter_input)
+    iters_so_far = resume
+
     while True:
         if timesteps_so_far > num_timesteps:
             break
-        logger.log("********** Iteration %i ************"%i)
+        logger.log("********** Iteration %i ************"%iters_so_far)
 
         # Collect paths until we have enough timesteps
         timesteps_this_batch = 0
         paths = []
         while True:
-            path = rollout(env, policy, max_pathlength, animate=(len(paths)==0 and (i % 10 == 0) and animate), obfilter=obfilter)
+#            path = rollout(env, policy, max_pathlength, animate=(len(paths)==0 and (i % 10 == 0) and animate), obfilter=obfilter)
+            path = rollout(env, policy, max_pathlength, animate=(len(paths)==0 and (iters_so_far % 10 == 0) and animate), obfilter=obfilter)
             paths.append(path)
             n = pathlength(path)
             timesteps_this_batch += n
@@ -117,14 +141,17 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
         # Policy update
         do_update(ob_no, action_na, standardized_adv_n)
 
+        min_stepsize = np.float32(1e-8)
+        max_stepsize = np.float32(1e0)
+
         # Adjust stepsize
         kl = policy.compute_kl(ob_no, oldac_dist)
-        if kl > desired_kl * 2:
+        if kl > desired_kl * 2.0:
             logger.log("kl too high")
-            U.eval(tf.assign(stepsize, stepsize / 1.5))
-        elif kl < desired_kl / 2:
+            U.eval(tf.assign(stepsize, tf.maximum(min_stepsize, stepsize / 1.5)))
+        elif kl < desired_kl / 2.0:
             logger.log("kl too low")
-            U.eval(tf.assign(stepsize, stepsize * 1.5))
+            U.eval(tf.assign(stepsize, tf.minimum(max_stepsize, stepsize * 1.5)))
         else:
             logger.log("kl just right!")
 
@@ -132,7 +159,15 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
         logger.record_tabular("EpRewSEM", np.std([path["reward"].sum()/np.sqrt(len(paths)) for path in paths]))
         logger.record_tabular("EpLenMean", np.mean([pathlength(path) for path in paths]))
         logger.record_tabular("KL", kl)
+
         if callback:
             callback()
         logger.dump_tabular()
-        i += 1
+        iters_so_far += 1
+
+        saver.save(tf.get_default_session(), os.path.join(logdir, agentName), global_step=iters_so_far)
+        ob_filter_path = os.path.join(os.path.abspath(logdir), "{}-{}".format('obfilter', iters_so_far))
+        with open(ob_filter_path, 'wb') as ob_filter_output:
+            pickle.dump(obfilter, ob_filter_output, pickle.HIGHEST_PROTOCOL)
+
+
