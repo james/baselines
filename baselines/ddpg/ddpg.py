@@ -71,7 +71,7 @@ class DDPG(object):
         self.actions = tf.placeholder(tf.float32, shape=(None,) + action_shape, name='actions')
         self.critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='critic_target')
         self.param_noise_stddev = tf.placeholder(tf.float32, shape=(), name='param_noise_stddev')
-        self.itr = tf.Variable(0,name="itr")
+        self.itr = tf.Variable(0, name="itr")
         self.one = tf.constant(1)
         self.itr_up = self.itr.assign_add(self.one)
         # Parameters.
@@ -319,14 +319,14 @@ class DDPG(object):
 
         return critic_loss, actor_loss
 
-    def initialize(self, sess,path = '.',restore=None,itr=0,overwrite=True):
+    def initialize(self, sess, path = None, restore=None, itr=0, overwrite=True):
         self.sess = sess
         self.saver = tf.train.Saver()
         if restore is None:
             self.sess.run(tf.global_variables_initializer())
             self.sess.run(self.target_init_updates)
         else:
-            self.saver.restore(self.sess,os.path.join(path,"{}-{}".format(restore,itr)))
+            self.saver.restore(self.sess, os.path.join(path,"{}-{}".format(restore, itr)))
             if overwrite:
                 with bz2.BZ2File(os.path.join(path,"{}.memory".format(restore)),"r") as f:
                     self.memory = pickle.load(f)
@@ -388,9 +388,11 @@ class DDPG(object):
                 self.param_noise_stddev: self.param_noise.current_stddev,
             })
 
-    def save(self, path='.', name="DDPG-Agent", overwrite=True):
+    def save(self, path=None, name="DDPG-Agent", overwrite=True):
         self.sess.run(self.itr_up)
-        self.saver.save(self.sess, os.path.join(path, name), global_step=self.itr.eval())
+    #    self.saver.save(self.sess, os.path.join(path, name), global_step=self.itr.eval())
+        self.saver.save(tf.get_default_session(), os.path.join(path, name), global_step=self.itr.eval())
+
         if overwrite:
             with bz2.BZ2File(os.path.join(path, "{}.memory".format(name)), "w") as f:
                 pickle.dump(self.memory, f)

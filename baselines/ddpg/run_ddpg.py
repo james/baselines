@@ -26,7 +26,7 @@ import tensorflow as tf
 from mpi4py import MPI
 
 
-def run(env_id, seed, noise_type, num_cpu, layer_norm, logdir, gym_monitor, evaluation, bind_to_core, hidden_size, portnum, **kwargs):
+def run(env_id, seed, noise_type, num_cpu, layer_norm, logdir, gym_monitor, evaluation, bind_to_core, hidden_size, nb_layers, portnum, **kwargs):
     kwargs['logdir'] = logdir
     whoami = mpi_fork(num_cpu, bind_to_core=bind_to_core)
     if whoami == 'parent':
@@ -85,8 +85,8 @@ def run(env_id, seed, noise_type, num_cpu, layer_norm, logdir, gym_monitor, eval
 
     # Configure components.
     memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape)
-    critic = Critic(layer_size=hidden_size, layer_norm=layer_norm)
-    actor = Actor(nb_actions, layer_size=hidden_size, layer_norm=layer_norm)
+    critic = Critic(layer_size=hidden_size, nb_layers=nb_layers, layer_norm=layer_norm)
+    actor = Actor(nb_actions, layer_size=hidden_size, nb_layers=nb_layers, layer_norm=layer_norm)
 
     # Seed everything to make things reproducible.
     seed = seed + 1000000 * rank
@@ -113,7 +113,7 @@ def run(env_id, seed, noise_type, num_cpu, layer_norm, logdir, gym_monitor, eval
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--env-id', type=str, default='Custom0-v0') #'Humanoid2-v1') # 'Walker2d2-v1')
+    parser.add_argument('--env-id', type=str, default='Walker2d-v1')
     boolean_flag(parser, 'render-eval', default=False)
     boolean_flag(parser, 'layer-norm', default=True)
     boolean_flag(parser, 'overwrite-memory', default=True)
@@ -121,10 +121,11 @@ def parse_args():
     parser.add_argument('--num-cpu', type=int, default=2)
     boolean_flag(parser, 'normalize-returns', default=False)
     boolean_flag(parser, 'normalize-observations', default=True)
-    parser.add_argument('--seed', type=int, default=57)
+    parser.add_argument('--seed', type=int, default=59)
     parser.add_argument('--critic-l2-reg', type=float, default=1e-2)
     parser.add_argument('--batch-size', type=int, default=128)  # per MPI worker
     parser.add_argument('--hidden_size', type=int, default=128)
+    parser.add_argument('--nb_layers', type=int, default=2)
     parser.add_argument('--actor-lr', type=float, default=1e-4)
     parser.add_argument('--critic-lr', type=float, default=1e-3)
     boolean_flag(parser, 'popart', default=False)
@@ -133,9 +134,9 @@ def parse_args():
     parser.add_argument('--clip-norm', type=float, default=5.0)
     parser.add_argument('--nb-epochs', type=int, default=1000)  # with default settings, perform 1M steps total
     parser.add_argument('--nb-epoch-cycles', type=int, default=20)
+    parser.add_argument('--nb-rollout-steps', type=int, default=200)  # per epoch cycle and MPI worker
     parser.add_argument('--nb-train-steps', type=int, default=50)  # per epoch cycle and MPI worker
-    parser.add_argument('--nb-eval-steps', type=int, default=200)  # per epoch cycle and MPI worker
-    parser.add_argument('--nb-rollout-steps', type=int, default=1000)  # per epoch cycle and MPI worker
+    parser.add_argument('--nb-eval-steps', type=int, default=500)  # per epoch cycle and MPI worker
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--logdir', type=str, default='saves') #default=None)
     parser.add_argument('--agentName',type=str, default='DDPG-Agent')
@@ -154,13 +155,16 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
 
-    utils.portnum = args['portnum']
+    portnum = args['portnum']
     utils.server_ip = args['server_ip']
     del args['portnum']
     del args['server_ip']
 
     hidden_size = args['hidden_size']
     del args['hidden_size']
+
+    nb_layers = args['nb_layers']
+    del args['nb_layers']
 
     # Figure out what logdir to use.
     if args['logdir'] is None:
@@ -176,4 +180,4 @@ if __name__ == '__main__':
             json.dump(args, f)
 
     # Run actual script.
-    run(hidden_size=hidden_size, portnum=utils.portnum, **args)
+    run(hidden_size=hidden_size, nb_layers=nb_layers, portnum=portnum, **args)
