@@ -13,27 +13,27 @@ from baselines.acktr.acktr_cont_parallel import learn
 from baselines.acktr.policies import GaussianMlpPolicy
 from baselines.acktr.value_functions import NeuralNetValueFunction
 
-from parallel_env import CustomParallelEnv
+#from parallel_env import CustomParallelEnv
 
-from custom_env import Custom0Env
+#from custom_env import Custom0Env
 
-from gym.envs.registration import register
+#from gym.envs.registration import register
 
-register(
-    id='Custom0-v0',
-    entry_point='custom_env:Custom0Env',
-    max_episode_steps=2000,
-    reward_threshold=1000.0,
-)
+#register(
+#    id='Custom0-v0',
+#    entry_point='custom_env:Custom0Env',
+#    max_episode_steps=2000,
+#    reward_threshold=1000.0,
+#)
 
-def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume, 
-          agentName, logdir, desired_kl, gamma, lam,
+def train(env, num_timesteps, timesteps_per_batch, seed, num_cpu, resume, 
+          logdir, agentName, desired_kl, gamma, lam,
           portnum, num_parallel
 ):
     if num_parallel > 1:
         env = CustomParallelEnv(num_parallel)
     else:
-        env = gym.make(env_id)
+        env = gym.make(env)
         env.seed(seed) # Todo: add seed to the random env too
 
     if logger.get_dir():
@@ -51,23 +51,23 @@ def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
             policy = GaussianMlpPolicy(ob_dim, ac_dim)
 
         learn(env, policy=policy, vf=vf,
-            gamma=0.99, lam=0.97, timesteps_per_batch=2048,
-            desired_kl=0.002,
-            num_timesteps=num_timesteps, animate=False)
+            gamma=gamma, lam=0.97, timesteps_per_batch=timesteps_per_batch,
+            desired_kl=desired_kl, resume=resume, logdir=logdir, agentName=agentName, 
+            num_timesteps=num_timesteps, animate=True)
 
         env.close()
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-id', type=str, default='Custom0-v0')
+    parser.add_argument('--env', type=str, default='Custom0-v0')
     parser.add_argument('--num-cpu', type=int, default=1)
-    parser.add_argument('--seed', type=int, default=59)
+    parser.add_argument('--seed', type=int, default=7)
     parser.add_argument('--logdir', type=str, default=None)
-    parser.add_argument('--agentName', type=str, default='ACKTR-Agent')
-    parser.add_argument('--resume', type=int, default=0)
+    parser.add_argument('--agentName', type=str, default='Humanoid-ACKTR-256')
+    parser.add_argument('--resume', type=int, default=1790)
 
     parser.add_argument('--num_timesteps', type=int, default=1e7)
-    parser.add_argument('--timesteps_per_batch', type=int, default=2048)
+    parser.add_argument('--timesteps_per_batch', type=int, default=5000)
     parser.add_argument('--desired_kl', type=float, default=0.002)
 
     parser.add_argument('--gamma', type=float, default=0.99)
@@ -88,8 +88,8 @@ if __name__ == "__main__":
     del args['portnum']
     del args['server_ip']
 
-    train(args['env_id'], num_timesteps=args['num_timesteps'], timesteps_per_batch=args['timesteps_per_batch'],
-          seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'], agentName=args['agentName'], 
-          logdir=args['logdir'],desired_kl=args['desired_kl'], gamma=args['gamma'], lam=args['lam'], 
+    train(env='Humanoid-v1', num_timesteps=args['num_timesteps'], timesteps_per_batch=args['timesteps_per_batch'],
+          seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'], logdir='Humanoid', agentName=args['agentName'], 
+          desired_kl=args['desired_kl'], gamma=args['gamma'], lam=args['lam'], 
           portnum=utils.portnum, num_parallel=args['num_parallel']
           )
