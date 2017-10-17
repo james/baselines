@@ -48,16 +48,57 @@ def rollout(env, policy, max_pathlength, animate=False, obfilter=None):
             "reward" : np.array(rewards), "action" : np.array(acs),
             "action_dist": np.array(ac_dists), "logp" : np.array(logps)}
 
+def rollout_parallel(env, policy, max_pathlength, num_parallel, animate=False, obfilter=None):
+    """
+    Simulate the env and policy for max_pathlength steps
+    """
+    ob = env.reset_parallel()
+    prev_ob = np.float32(np.zeros(ob.shape))
+    if obfilter: ob = obfilter(ob)
+    terminated = False
 
-def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agentName, num_timesteps,
-    animate=False, callback=None, desired_kl=0.002):
+    obs = []
+    acs = []
+    ac_dists = []
+    logps = []
+    rewards = []
+    for _ in range(max_pathlength):
+    #    obs_all = np.reshape(obs, (max_pathlength * num_parallel, -1))
+    #    obs_all = np.reshape(obs, (max_pathlength * num_parallel, -1))
+    #    rews_all = np.reshape(rews, max_pathlength * num_parallel)
+
+        if animate:
+            env.render()
+        state = np.concatenate([ob, prev_ob], -1)
+        obs.append(state)
+        ac, ac_dist, logp = policy.act_parallel(state)
+        acs.append(ac)
+        ac_dists.append(ac_dist)
+        logps.append(logp)
+        prev_ob = np.copy(ob)
+        
+    #    scaled_ac = env.action_space.low + (ac + 1.) * 0.5 * (env.action_space.high - env.action_space.low)
+    #    scaled_ac = np.clip(scaled_ac, env.action_space.low, env.action_space.high)
+        scaled_ac = ac # Todo: scale in a correct way
+        ob, rew, done, _ = env.step_parallel(scaled_ac)
+        if obfilter: ob = obfilter(ob)
+        rewards.append(rew)
+        if done:
+            terminated = True
+            break
+    return {"observation" : np.array(obs), "terminated" : terminated,
+            "reward" : np.array(rewards), "action" : np.array(acs),
+            "action_dist": np.array(ac_dists), "logp" : np.array(logps)}
+
+def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, agentName, logdir, num_timesteps,
+    animate=False, callback=None, desired_kl=0.002, num_parallel=1):
 
     obfilter = ZFilter(env.observation_space.shape)
 
     max_pathlength = env.spec.timestep_limit
     stepsize = tf.Variable(initial_value=np.float32(np.array(0.03)), name='stepsize')
     inputs, loss, loss_sampled = policy.update_info
-    optim = kfac.KfacOptimizer(learning_rate=stepsize, cold_lr=stepsize*(1.0 - 0.9), momentum=0.9, kfac_update=2,\
+    optim = kfac.KfacOptimizer(learning_rate=stepsize, cold_lr=stepsize*(1-0.9), momentum=0.9, kfac_update=2,\
                                 epsilon=1e-2, stats_decay=0.99, async=1, cold_iter=1,
                                 weight_decay_dict=policy.wd_dict, max_grad_norm=None)
     pi_var_list = []
@@ -76,20 +117,14 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agen
         assert (qr != None)
         enqueue_threads.extend(qr.create_threads(U.get_session(), coord=coord, start=True))
 
-    timesteps_so_far = 0
-    saver = tf.train.Saver(max_to_keep = 10)
     if resume > 0:
         saver.restore(tf.get_default_session(), os.path.join(os.path.abspath(logdir), "{}-{}".format(agentName, resume)))
         ob_filter_path = os.path.join(os.path.abspath(logdir), "{}-{}".format('obfilter', resume))
         with open(ob_filter_path, 'rb') as ob_filter_input:
             obfilter = pickle.load(ob_filter_input)
-            print("Loaded observation filter")
     iters_so_far = resume
 
-    logF = open(os.path.join(logdir, 'log.txt'), 'a')
-    logF2 = open(os.path.join(logdir, 'log_it.txt'), 'a')
-    logStats = open(os.path.join(logdir, 'log_stats.txt'), 'a')
-
+    timesteps_so_far = 0
     while True:
         if timesteps_so_far > num_timesteps:
             break
@@ -99,13 +134,22 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agen
         timesteps_this_batch = 0
         paths = []
         while True:
-            path = rollout(env, policy, max_pathlength, animate=(len(paths)==0 and (iters_so_far % 10 == 0) and animate), obfilter=obfilter)
-            paths.append(path)
-            n = pathlength(path)
-            timesteps_this_batch += n
-            timesteps_so_far += n
-            if timesteps_this_batch > timesteps_per_batch:
-                break
+            if num_parallel <= 1:
+                path = rollout(env, policy, max_pathlength, animate=(len(paths)==0 and (iters_so_far % 10 == 0) and animate), obfilter=obfilter)
+                paths.append(path)
+                n = pathlength(path)
+                timesteps_this_batch += n
+                timesteps_so_far += n
+                if timesteps_this_batch > timesteps_per_batch:
+                    break
+            else:
+                path = rollout(env, policy, max_pathlength, animate=(len(paths)==0 and (iters_so_far % 10 == 0) and animate), obfilter=obfilter)
+                paths.append(path)
+                n = pathlength(path)
+                timesteps_this_batch += n
+                timesteps_so_far += n
+                if timesteps_this_batch > timesteps_per_batch:
+                    break
 
         # Estimate advantage function
         vtargs = []
@@ -147,27 +191,16 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agen
         else:
             logger.log("kl just right!")
 
-        rew_mean = np.mean([path["reward"].sum() for path in paths])
-        logger.record_tabular("EpRewMean", rew_mean)
+        logger.record_tabular("EpRewMean", np.mean([path["reward"].sum() for path in paths]))
         logger.record_tabular("EpRewSEM", np.std([path["reward"].sum()/np.sqrt(len(paths)) for path in paths]))
         logger.record_tabular("EpLenMean", np.mean([pathlength(path) for path in paths]))
         logger.record_tabular("KL", kl)
-
-        logF.write(str(rew_mean) + "\n")
-        logF2.write(str(iters_so_far) + "," + str(rew_mean) + "\n")
-     #   json.dump(combined_stats, logStats)
-        logF.flush()
-        logF2.flush()
-     #   logStats.flush()
-
-        save_interval = 2
-        if save_interval and (iters_so_far % save_interval == 0 or iters_so_far == 1):
-            saver.save(tf.get_default_session(), os.path.join(logdir, agentName), global_step=iters_so_far)
-            ob_filter_path = os.path.join(os.path.abspath(logdir), "{}-{}".format('obfilter', iters_so_far))
-            with open(ob_filter_path, 'wb') as ob_filter_output:
-                pickle.dump(obfilter, ob_filter_output, pickle.HIGHEST_PROTOCOL)
-
         if callback:
             callback()
         logger.dump_tabular()
         iters_so_far += 1
+
+        saver.save(tf.get_default_session(), os.path.join(logdir, agentName), global_step=iters_so_far)
+        ob_filter_path = os.path.join(os.path.abspath(logdir), "{}-{}".format('obfilter', iters_so_far))
+        with open(ob_filter_path, 'wb') as ob_filter_output:
+            pickle.dump(obfilter, ob_filter_output, pickle.HIGHEST_PROTOCOL)
