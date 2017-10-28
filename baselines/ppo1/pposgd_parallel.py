@@ -355,17 +355,19 @@ def learn(env, policy_func, *,
         saver.restore(tf.get_default_session(), os.path.join(os.path.abspath(logdir), "{}-{}".format(agentName, resume)))
     iters_so_far = resume
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
-    logF = open(logdir + "\\" + 'log.txt', 'a')
-    logStats = open(logdir + "\\" + 'log_stats.txt', 'a')
-    if os.path.exists(logdir + "\\" +'ob_list_'+str(rank)+'.pkl'):
-        with open(logdir + "\\" +'ob_list_'+str(rank)+'.pkl', 'rb') as f:
-            ob_list = pickle.load(f)
-    else:
-        ob_list = []
+
+    logF = open(os.path.join(logdir, 'log.txt'), 'a')
+    logStats = open(os.path.join(logdir, 'log_stats.txt'), 'a')
 
     dump_training = 0
     learn_from_training = 0
     if dump_training:
+        if os.path.exists(logdir + "\\" + 'ob_list_' + str(rank) + '.pkl'):
+            with open(logdir + "\\" +'ob_list_' + str(rank) + '.pkl', 'rb') as f:
+                ob_list = pickle.load(f)
+        else:
+            ob_list = []
+
         # , "mean": pi.ob_rms.mean, "std": pi.ob_rms.std
         saverRMS = tf.train.Saver({"_sum": pi.ob_rms._sum, "_sumsq": pi.ob_rms._sumsq, "_count": pi.ob_rms._count})
         saverRMS.save(tf.get_default_session(), os.path.join(os.path.abspath(logdir), "rms.tf"))
@@ -381,10 +383,9 @@ def learn(env, policy_func, *,
             pickle.dump(vpred, f)
             pickle.dump(pdparam, f)
         exit(0)
+        
     if learn_from_training:
         # , "mean": pi.ob_rms.mean, "std": pi.ob_rms.std
-
-
         with open('training.pkl', 'rb') as f:
             ob_np = pickle.load(f)
             vpred = pickle.load(f)
@@ -474,7 +475,8 @@ def learn(env, policy_func, *,
         # ob, ac, atarg, ret, td1ret = map(np.concatenate, (obs, acs, atargs, rets, td1rets))
         ob, ac, atarg, tdlamret = seg["ob"], seg["ac"], seg["adv"], seg["tdlamret"]
 
-        ob_list.append(ob.tolist())
+        if dump_training:
+            ob_list.append(ob.tolist())
         vpredbefore = seg["vpred"] # predicted value function before udpate
         atarg = (atarg - atarg.mean()) / atarg.std() # standardized advantage function estimate
         d = Dataset(dict(ob=ob, ac=ac, atarg=atarg, vtarg=tdlamret), shuffle=not pi.recurrent)
@@ -521,8 +523,10 @@ def learn(env, policy_func, *,
         logger.record_tabular("TimestepsSoFar", timesteps_so_far)
         logger.record_tabular("TimeElapsed", time.time() - tstart)
 
-        with open(logdir + "\\" + 'ob_list_' + str(rank) + '.pkl', 'wb') as f:
-            pickle.dump(ob_list, f)
+        if dump_training:
+            with open(logdir + "\\" + 'ob_list_' + str(rank) + '.pkl', 'wb') as f:
+                pickle.dump(ob_list, f)
+
         if MPI.COMM_WORLD.Get_rank()==0:
             logF.write(str(rewmean) + "\n")
             logStats.write(logger.get_str() + "\n")
