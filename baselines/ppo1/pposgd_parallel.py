@@ -352,14 +352,15 @@ def learn(env, policy_func, *,
         saver.restore(tf.get_default_session(), os.path.join(os.path.abspath(logdir), "{}-{}".format(agentName, resume)))
     iters_so_far = resume
     assert sum([max_iters>0, max_timesteps>0, max_episodes>0, max_seconds>0])==1, "Only one time constraint permitted"
-    logF = open(logdir + "\\" + 'log.txt', 'a')
-    logStats = open(logdir + "\\" + 'log_stats.txt', 'a')
+
+    logF = open(os.path.join(logdir, 'log.txt'), 'a')
+    logStats = open(os.path.join(logdir, 'log_stats.txt'), 'a')
 
     dump_training = 0
     learn_from_training = 0
     if dump_training:
-        if os.path.exists(logdir + "\\" +'ob_list_'+str(rank)+'.pkl'):
-            with open(logdir + "\\" +'ob_list_'+str(rank)+'.pkl', 'rb') as f:
+        if os.path.exists(logdir + "\\" + 'ob_list_' + str(rank) + '.pkl'):
+            with open(logdir + "\\" +'ob_list_' + str(rank) + '.pkl', 'rb') as f:
                 ob_list = pickle.load(f)
         else:
             ob_list = []
@@ -525,7 +526,7 @@ def learn(env, policy_func, *,
         if dump_training:
             with open(logdir + "\\" + 'ob_list_' + str(rank) + '.pkl', 'wb') as f:
                 pickle.dump(ob_list, f)
-        
+
         if MPI.COMM_WORLD.Get_rank()==0:
             logF.write(str(rewmean) + "\n")
             logStats.write(logger.get_str() + "\n")
