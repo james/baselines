@@ -27,7 +27,7 @@ from baselines.acktr.value_functions import NeuralNetValueFunction
 #)
 
 def train(env, num_timesteps, timesteps_per_batch, seed, num_cpu, resume, 
-          logdir, agentName, desired_kl, gamma, lam,
+          hid_size, num_hid_layers, logdir, agentName, desired_kl, gamma, lam,
           portnum, num_parallel
 ):
     if num_parallel > 1:
@@ -46,9 +46,9 @@ def train(env, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
         ob_dim = env.observation_space.shape[0]
         ac_dim = env.action_space.shape[0]
         with tf.variable_scope("vf"):
-            vf = NeuralNetValueFunction(ob_dim, ac_dim)
+            vf = NeuralNetValueFunction(ob_dim, ac_dim, hid_size=128, num_hid_layers=2)
         with tf.variable_scope("pi"):
-            policy = GaussianMlpPolicy(ob_dim, ac_dim)
+            policy = GaussianMlpPolicy(ob_dim, ac_dim, hid_size=128, num_hid_layers=2)
 
         learn(env, policy=policy, vf=vf,
             gamma=gamma, lam=0.97, timesteps_per_batch=timesteps_per_batch,
@@ -64,12 +64,14 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=7)
     parser.add_argument('--logdir', type=str, default=None)
     parser.add_argument('--agentName', type=str, default='Humanoid-ACKTR-256')
-    parser.add_argument('--resume', type=int, default=1790)
+    parser.add_argument('--resume', type=int, default=0)
+
+    parser.add_argument('--hid_size', type=int, default=128)
+    parser.add_argument('--num_hid_layers', type=int, default=2)
 
     parser.add_argument('--num_timesteps', type=int, default=1e7)
     parser.add_argument('--timesteps_per_batch', type=int, default=5000)
     parser.add_argument('--desired_kl', type=float, default=0.002)
-
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--lam', type=float, default=0.95)
 
@@ -88,8 +90,11 @@ if __name__ == "__main__":
     del args['portnum']
     del args['server_ip']
 
-    train(env='Humanoid-v1', num_timesteps=args['num_timesteps'], timesteps_per_batch=args['timesteps_per_batch'],
-          seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'], logdir='Humanoid', agentName=args['agentName'], 
-          desired_kl=args['desired_kl'], gamma=args['gamma'], lam=args['lam'], 
-          portnum=utils.portnum, num_parallel=args['num_parallel']
-          )
+    train(env='Humanoid-v1', num_timesteps=args['num_timesteps'],
+        timesteps_per_batch=args['timesteps_per_batch'],
+        seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'],
+        hid_size=args['hid_size'], num_hid_layers=args['num_hid_layers'],
+        logdir='Humanoid', agentName=args['agentName'],
+        desired_kl=args['desired_kl'], gamma=args['gamma'], lam=args['lam'],
+        portnum=utils.portnum, num_parallel=args['num_parallel']
+        )
