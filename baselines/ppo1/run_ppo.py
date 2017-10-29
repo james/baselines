@@ -164,7 +164,7 @@ class CustomParallelEnv:
                     # print("Wait for reply")
                     message = socket.recv()
 
-                    ss = np.zeros([self.numo]);
+                    ss = np.zeros([self.numo])
                     # r = np.zeros([self.n_parallel])
                     # done = [False] * self.n_parallel
                     off = 0
@@ -177,7 +177,7 @@ class CustomParallelEnv:
                     # off += 1
                     return ss, r, done, {}
             else:
-                req = "1";
+                req = "1"
                 for i in range(self.numa):
                     req += " " + str(actions[i])
 
@@ -303,7 +303,7 @@ class CustomParallelEnv:
                 self.socket.send_string(req)
 
                 #  Get the reply.
-                ss = np.zeros([self.n_parallel, self.numo]);
+                ss = np.zeros([self.n_parallel, self.numo])
                 # print("Wait for reply")
                 # print("** Recv")
                 message = self.socket.recv()
@@ -325,8 +325,8 @@ class CustomParallelEnv:
 
 def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
           agentName, logdir, hid_size, num_hid_layers, clip_param, entcoeff,
-          optim_epochs, optim_stepsize, optim_batchsize, gamma, lam,
-          portnum,num_parallel
+          optim_epochs, optim_batchsize, optim_stepsize, optim_schedule,
+          gamma, lam, portnum, num_parallel
 ):
     from baselines.ppo1 import mlp_policy, pposgd_parallel
     print("num cpu = " + str(num_cpu))
@@ -367,7 +367,7 @@ def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
         utils.server_ip = servers[snum]
 
     set_global_seeds(workerseed)
-    if num_parallel > 0:
+    if num_parallel > 1:
         env = CustomParallelEnv(num_parallel)
     else:
         env = gym.make(env_id)
@@ -386,9 +386,11 @@ def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
             max_timesteps=num_timesteps,
             timesteps_per_batch=timesteps_per_batch,
             clip_param=clip_param, entcoeff=entcoeff,
-            optim_epochs=optim_epochs, optim_stepsize=optim_stepsize, optim_batchsize=optim_batchsize,
-            gamma=gamma, lam=lam,
-            resume=resume, agentName=agentName, logdir=logdir, num_parallel=num_parallel
+            optim_epochs=optim_epochs, optim_stepsize=optim_stepsize,
+            optim_batchsize=optim_batchsize,gamma=gamma, lam=lam,
+            schedule=optim_schedule, resume=resume,
+            agentName=agentName, logdir=logdir,
+            num_parallel=num_parallel
         )
     if num_parallel == 0:
         env.close()
@@ -396,31 +398,32 @@ def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env-id', type=str, default='Custom0-v0') #'Humanoid2-v1') # 'Walker2d2-v1')
+    parser.add_argument('--env-id', type=str, default='Custom0-v0')
     parser.add_argument('--num-cpu', type=int, default=1)
     parser.add_argument('--seed', type=int, default=57)
-    parser.add_argument('--logdir', type=str, default='.') #default=None)
-    parser.add_argument('--agentName', type=str, default='PPO-Agent')
-    parser.add_argument('--resume', type=int, default = 0)
+    parser.add_argument('--logdir', type=str, default='FetchRope') #default=None)
+    parser.add_argument('--agentName', type=str, default='FetchRope_256b')
+    parser.add_argument('--resume', type=int, default=0)
 
-    parser.add_argument('--num_timesteps', type=int,default = 1e6)
-    parser.add_argument('--timesteps_per_batch', type=int, default=1000)
-    parser.add_argument('--hid_size', type=int, default=64)
+    parser.add_argument('--num_timesteps', type=int, default=1e7)
+    parser.add_argument('--timesteps_per_batch', type=int, default=4096)
+    parser.add_argument('--hid_size', type=int, default=256)
     parser.add_argument('--num_hid_layers', type=int, default=2)
     parser.add_argument('--clip_param', type=float, default=0.2)
     parser.add_argument('--entcoeff', type=float, default=0.0)
     parser.add_argument('--optim_epochs', type=int, default=20)
-    parser.add_argument('--optim_stepsize', type=float, default=3e-4)
     parser.add_argument('--optim_batchsize', type=int, default=64)
+    parser.add_argument('--optim_stepsize', type=float, default=5e-4) # 3e-4 isefault for single agent training with constant schedule
+    parser.add_argument('--optim_schedule', type=str, default='linear_reduced') # Other options: 'constant', 'linear'
 
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--lam', type=float, default=0.95)
 
-    parser.add_argument("--portnum", required=False, type=int, default=5050)
-    parser.add_argument("--server_ip", required=False, default="localhost")
-    parser.add_argument("--num_parallel", type=int, default=0)
-    parser.add_argument("--server_list", required=False, type=str,default="")
-    parser.add_argument("--num_thread_list", required=False, type=str, default="") #Must either be "" or summed to num_cpu
+    parser.add_argument('--portnum', required=False, type=int, default=5050)
+    parser.add_argument('--server_ip', required=False, default='localhost')
+    parser.add_argument('--num_parallel', type=int, default=0)
+    parser.add_argument('--server_list', required=False, type=str, default='')
+    parser.add_argument('--num_thread_list', required=False, type=str, default='') #Must either be "" or summed to num_cpu
 
     return vars(parser.parse_args())
 
@@ -440,7 +443,8 @@ def main():
           seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'], agentName=args['agentName'], 
           logdir=args['logdir'], hid_size=args['hid_size'], num_hid_layers=args['num_hid_layers'],
           clip_param=args['clip_param'], entcoeff=args['entcoeff'],
-          optim_epochs=args['optim_epochs'], optim_stepsize=args['optim_stepsize'], optim_batchsize=args['optim_batchsize'],
+          optim_epochs=args['optim_epochs'], optim_batchsize=args['optim_batchsize'],
+          optim_stepsize=args['optim_stepsize'], optim_schedule=args['optim_schedule'],
           gamma=args['gamma'], lam=args['lam'], portnum=utils.portnum, num_parallel=args['num_parallel']
           )
 

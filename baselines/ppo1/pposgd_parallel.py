@@ -102,7 +102,6 @@ def traj_segment_generator(pi, env, horizon, stochastic, num_parallel, num_cpu, 
             prevac = ac
             #ac, vpred = pi.act(stochastic, ob)
 
-
             if rank == 0:
                 ac_whole, vpred_whole = pi.act_parallel(stochastic, ob_whole)
                 #print("t = " + str(t) + " ac_whole = " + str(ac_whole) + " vpred_whole = " + str(vpred_whole))
@@ -153,7 +152,6 @@ def traj_segment_generator(pi, env, horizon, stochastic, num_parallel, num_cpu, 
             rew = rew_a[0]
             com.Scatter(new_flat, new_a, root=0)
             new = new_a[0]
-
             #print("t = " + str(t) + " rank = " + str(rank) + " ob = " + str(ob) + " rew = " + str(rew)+ " new = " + str(new))
 
             rews[i] = rew
@@ -168,7 +166,6 @@ def traj_segment_generator(pi, env, horizon, stochastic, num_parallel, num_cpu, 
                 #ob = env.reset()
             t += 1
     else:
-
         new = np.ones(num_parallel, 'int32')  # marks if we're on first timestep of an episode
 
         ob = env.reset_parallel()
@@ -208,7 +205,7 @@ def traj_segment_generator(pi, env, horizon, stochastic, num_parallel, num_cpu, 
                 ep_rets_all = [item for sublist in ep_rets for item in sublist]
                 ep_lens_all = [item for sublist in ep_lens for item in sublist]
                 yield {"ob" : obs_all, "rew" : rews_all, "vpred" : vpreds_all, "new" : news_all,
-                        "ac" : acs_all, "prevac" : prevacs_all, "nextvpred": vpred * (1 - new),
+                        "ac" : acs_all, "prevac" : prevacs_all, "nextvpred": vpred * (1.0 - new),
                         "ep_rets" : ep_rets_all, "ep_lens" : ep_lens_all}
                 # Be careful!!! if you change the downstream algorithm to aggregate
                 # several of these batches, then be sure to do a deepcopy
@@ -382,10 +379,9 @@ def learn(env, policy_func, *,
             pickle.dump(vpred, f)
             pickle.dump(pdparam, f)
         exit(0)
+
     if learn_from_training:
         # , "mean": pi.ob_rms.mean, "std": pi.ob_rms.std
-
-
         with open('training.pkl', 'rb') as f:
             ob_np = pickle.load(f)
             vpred = pickle.load(f)
@@ -430,7 +426,6 @@ def learn(env, policy_func, *,
         if resume > 0:
             saver.restore(tf.get_default_session(),
                           os.path.join(os.path.abspath(logdir), "{}-{}".format(agentName, resume)))
-
         for q in range(100):
             sumLoss = 0
             for batch in d.iterate_once(batch_size):
@@ -460,14 +455,18 @@ def learn(env, policy_func, *,
         if schedule == 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
-            cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
+            cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0.0)
+        elif schedule == 'linear_reduced':
+            cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0.1)
+        elif schedule == 'cyclic':
+        #    cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
+            raise NotImplementedError
         else:
             raise NotImplementedError
 
         logger.log("********** Iteration %i ************"%iters_so_far)
 
         seg = seg_gen.__next__()
-
         add_vtarg_and_adv(seg, gamma, lam, timesteps_per_batch, num_parallel, num_cpu)
         #print(" ob= " + str(seg["ob"])+ " rew= " + str(seg["rew"])+ " vpred= " + str(seg["vpred"])+ " new= " + str(seg["new"])+ " ac= " + str(seg["ac"])+ " prevac= " + str(seg["prevac"])+ " nextvpred= " + str(seg["nextvpred"])+ " ep_rets= " + str(seg["ep_rets"])+ " ep_lens= " + str(seg["ep_lens"]))
 
