@@ -237,7 +237,7 @@ def add_vtarg_and_adv(seg, gamma, lam, horizon, num_parallel, num_cpu):
     """
     Compute target value using TD(lambda) estimator, and advantage with GAE(lambda)
     """
-    if (num_parallel == 0) or (num_cpu == num_parallel):
+    if (num_parallel <= 1) or (num_cpu == num_parallel):
         new = np.append(seg["new"], 0)  # last element is only used for last vtarg, but we already zeroed it if last new = 1
         vpred = np.append(seg["vpred"], seg["nextvpred"])
         T = len(seg["rew"])
@@ -245,7 +245,7 @@ def add_vtarg_and_adv(seg, gamma, lam, horizon, num_parallel, num_cpu):
         rew = seg["rew"]
         lastgaelam = 0
         for t in reversed(range(T)):
-            nonterminal = 1-new[t+1]
+            nonterminal = 1 - new[t+1]
             delta = rew[t] + gamma * vpred[t+1] * nonterminal - vpred[t]
             gaelam[t] = lastgaelam = delta + gamma * lam * nonterminal * lastgaelam
 
@@ -275,13 +275,14 @@ def learn(env, policy_func, *,
         optim_epochs, optim_stepsize, optim_batchsize,# optimization hypers
         gamma, lam, # advantage estimation
         max_timesteps=0, max_episodes=0, max_iters=0, max_seconds=0,  # time constraint
+        noisy_nets,
         callback=None, # you can do anything in the callback, since it takes locals(), globals()
         adam_epsilon=1e-5,
         schedule='constant', # annealing for stepsize parameters (epsilon and adam)
         logdir=".",
         agentName="PPO-Agent",
         resume = 0,
-        num_parallel=0,
+        num_parallel=1,
         num_cpu=1
         ):
     # Setup losses and stuff
@@ -295,8 +296,8 @@ def learn(env, policy_func, *,
 
     #print("rank = " + str(rank) + " ob_space = "+str(ob_space.shape) + " ac_space = "+str(ac_space.shape))
     #exit(0)
-    pi = policy_func("pi", ob_space, ac_space) # Construct network for new policy
-    oldpi = policy_func("oldpi", ob_space, ac_space) # Network for old policy
+    pi = policy_func("pi", ob_space, ac_space, noisy_nets) # Construct network for new policy
+    oldpi = policy_func("oldpi", ob_space, ac_space, noisy_nets) # Network for old policy
     atarg = tf.placeholder(dtype=tf.float32, shape=[None]) # Target advantage function (if applicable)
     ret = tf.placeholder(dtype=tf.float32, shape=[None]) # Empirical return
 
@@ -338,7 +339,11 @@ def learn(env, policy_func, *,
 
     # Prepare for rollouts
     # ----------------------------------------
-    seg_gen = traj_segment_generator(pi, env, timesteps_per_batch, stochastic=True, num_parallel=num_parallel, num_cpu=num_cpu, rank=rank, ob_size=ob_size, ac_size=ac_size,com=MPI.COMM_WORLD)
+    if noisy_nets:
+        stochastic = False
+    else:
+        stochastic = True
+    seg_gen = traj_segment_generator(pi, env, timesteps_per_batch, stochastic=stochastic, num_parallel=num_parallel, num_cpu=num_cpu, rank=rank, ob_size=ob_size, ac_size=ac_size,com=MPI.COMM_WORLD)
 
     episodes_so_far = 0
     timesteps_so_far = 0
@@ -504,6 +509,7 @@ def learn(env, policy_func, *,
             losses.append(newlosses)
         meanlosses,_,_ = mpi_moments(losses, axis=0)
         logger.log(fmt_row(13, meanlosses))
+
         for (lossval, name) in zipsame(meanlosses, loss_names):
             logger.record_tabular("loss_"+name, lossval)
         logger.record_tabular("ev_tdlam_before", explained_variance(vpredbefore, tdlamret))
@@ -512,6 +518,7 @@ def learn(env, policy_func, *,
         lens, rews = map(flatten_lists, zip(*listoflrpairs))
         lenbuffer.extend(lens)
         rewbuffer.extend(rews)
+
         logger.record_tabular("EpLenMean", np.mean(lenbuffer))
         rewmean = np.mean(rewbuffer)
         logger.record_tabular("EpRewMean", rewmean)
@@ -519,6 +526,7 @@ def learn(env, policy_func, *,
         episodes_so_far += len(lens)
         timesteps_so_far += sum(lens)
         iters_so_far += 1
+
         logger.record_tabular("EpisodesSoFar", episodes_so_far)
         logger.record_tabular("TimestepsSoFar", timesteps_so_far)
         logger.record_tabular("TimeElapsed", time.time() - tstart)

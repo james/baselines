@@ -22,13 +22,13 @@ def train(env_id, num_frames, seed, num_cpu):
     set_global_seeds(seed)
     env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
     policy_fn = CnnPolicy
-    learn(policy_fn, env, seed, total_timesteps=num_timesteps, nprocs=num_cpu)
+    learn(policy_fn, env, seed, save_interval=10, total_timesteps=num_timesteps, nprocs=num_cpu)
     env.close()
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--env', help='environment ID', default='BreakoutNoFrameskip-v4')
+    parser.add_argument('--env', help='environment ID', default='PongNoFrameskip-v4') #'BreakoutNoFrameskip-v4')
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--million_frames', help='How many frames to train (/ 1e6). '
         'This number gets divided by 4 due to frameskip', type=int, default=40)

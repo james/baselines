@@ -5,18 +5,21 @@ import numpy as np
 import tensorflow as tf
 from baselines import logger
 
-from baselines.common import set_global_seeds, explained_variance
+#from baselines.common import set_global_seeds, explained_variance
+from baselines import common
+from baselines.common import tf_util as U
 
 from baselines.acktr.utils import discount_with_dones
 from baselines.acktr.utils import Scheduler, find_trainable_variables
-from baselines.acktr.utils import cat_entropy, mse
+#from baselines.acktr.utils import cat_entropy, mse
+from baselines.acktr.filters import ZFilter
 from baselines.acktr import kfac
 
 
 class Model(object):
 
     def __init__(self, policy, ob_space, ac_space, nenvs, total_timesteps, nprocs=8, nsteps=20,
-                 nstack=4, ent_coef=0.01, vf_coef=0.5, vf_fisher_coef=1.0, lr=0.25, max_grad_norm=0.5,
+                 nstack=4, ent_coef=0.01, vf_coef=0.5, vf_fisher_coef=1.0, lr=1e3, max_grad_norm=1.0,
                  kfac_clip=0.001, lrschedule='linear'):
         config = tf.ConfigProto(allow_soft_placement=True,
                                 intra_op_parallelism_threads=nprocs,
@@ -44,7 +47,6 @@ class Model(object):
         vf_loss = tf.reduce_mean(mse(tf.squeeze(train_model.vf), R))
         train_loss = pg_loss + vf_coef * vf_loss
 
-
         ##Fisher loss construction
         self.pg_fisher = pg_fisher_loss = -tf.reduce_mean(logpac)
         sample_net = train_model.vf + tf.random_normal(tf.shape(train_model.vf))
@@ -53,7 +55,7 @@ class Model(object):
 
         self.params=params = find_trainable_variables("model")
 
-        self.grads_check = grads = tf.gradients(train_loss,params)
+        self.grads_check = grads = tf.gradients(train_loss, params)
 
         with tf.device('/gpu:0'):
             self.optim = optim = kfac.KfacOptimizer(learning_rate=PG_LR, clip_kl=kfac_clip,\
@@ -191,12 +193,10 @@ def learn(policy, env, seed, total_timesteps=int(40e6), gamma=0.99, log_interval
         obs, states, rewards, masks, actions, values = runner.run()
         policy_loss, value_loss, policy_entropy = model.train(obs, states, rewards, masks, actions, values)
         model.old_obs = obs
-        nseconds = time.time() - tstart
+        nseconds = time.time()-tstart
         fps = int((update*nbatch)/nseconds)
         if update % log_interval == 0 or update == 1:
             ev = explained_variance(values, rewards)
-            rew_mean = np.mean([np.sum(reward) for reward in rewards])
-            logger.record_tabular("ep_rew_mean", rew_mean)
             logger.record_tabular("nupdates", update)
             logger.record_tabular("total_timesteps", update*nbatch)
             logger.record_tabular("fps", fps)

@@ -58,11 +58,7 @@ def rollout_parallel(env, policy, max_pathlength, num_parallel, animate=False, o
     if obfilter: ob = obfilter(ob)
     terminated = False
 
-    obs = []
-    acs = []
-    ac_dists = []
-    logps = []
-    rewards = []
+    obs, acs, ac_dists, logps, rewards = [],[],[],[],[]
 
     mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = [],[],[],[],[]
     for _ in range(max_pathlength):
@@ -70,7 +66,7 @@ def rollout_parallel(env, policy, max_pathlength, num_parallel, animate=False, o
             env.render()
         state = np.concatenate([ob, prev_ob], -1)
         obs.append(state)
-        ac, ac_dist, logp = policy.acact_parallelt(state) # add ?
+        ac, ac_dist, logp = policy.act_parallelt(state)
         acs.append(ac)
         ac_dists.append(ac_dist)
         logps.append(logp)
@@ -80,13 +76,13 @@ def rollout_parallel(env, policy, max_pathlength, num_parallel, animate=False, o
         
         ob, rew, done, _ = env.step_parallel(scaled_ac)
         #batch of steps to batch of rollouts
-    #    mb_obs = np.asarray(mb_obs, dtype=np.float32).swapaxes(1, 0).reshape(self.batch_ob_shape)
-    #    mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
-    #    mb_actions = np.asarray(mb_actions, dtype=np.int32).swapaxes(1, 0)
-    #    mb_values = np.asarray(mb_values, dtype=np.float32).swapaxes(1, 0)
-    #    mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
-    #    mb_masks = mb_dones[:, :-1]
-    #    mb_dones = mb_dones[:, 1:]
+        mb_obs = np.asarray(mb_obs, dtype=np.float32).swapaxes(1, 0).reshape(self.batch_ob_shape)
+        mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
+        mb_actions = np.asarray(mb_actions, dtype=np.int32).swapaxes(1, 0)
+        mb_values = np.asarray(mb_values, dtype=np.float32).swapaxes(1, 0)
+        mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
+        mb_masks = mb_dones[:, :-1]
+        mb_dones = mb_dones[:, 1:]
 
         if obfilter: ob = obfilter(ob)
         rewards.append(rew)
@@ -135,6 +131,7 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, agentName, l
             obfilter = pickle.load(ob_filter_input)
     iters_so_far = resume
 
+    bestReward = -1000000.0
     logF = open(os.path.join(logdir, 'log.txt'), 'a')
     logF2 = open(os.path.join(logdir, 'log_it.txt'), 'a')
     logStats = open(os.path.join(logdir, 'log_stats.txt'), 'a')
@@ -210,7 +207,17 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, agentName, l
         logF2.flush()
      #   logStats.flush()
 
-        if save_interval and (iters_so_far % save_interval == 0 or iters_so_far == 1):
+        if rew_mean > bestReward:
+            bestReward = rew_mean
+            print('New best reward = ', bestReward)
+            print('Episode ', iters_so_far)
+            saver.save(tf.get_default_session(), os.path.join(logdir, "{}-{}".format(agentName, '_best')))
+            ob_filter_path = os.path.join(os.path.abspath(logdir), "{}_{}".format('obfilter', 'best'))
+            with open(ob_filter_path, 'wb') as ob_filter_output:
+                pickle.dump(obfilter, ob_filter_output, pickle.HIGHEST_PROTOCOL)
+
+
+        if (save_interval and (iters_so_far % save_interval == 0 or iters_so_far == 1):
             saver.save(tf.get_default_session(), os.path.join(logdir, agentName), global_step=iters_so_far)
             ob_filter_path = os.path.join(os.path.abspath(logdir), "{}-{}".format('obfilter', iters_so_far))
             with open(ob_filter_path, 'wb') as ob_filter_output:

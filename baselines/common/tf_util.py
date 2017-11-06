@@ -92,6 +92,10 @@ def categorical_sample_logits(X):
     return argmax(X - tf.log(-tf.log(U)), axis=1)
 
 
+def sample_noise(shape):
+    noise = tf.random_normal(shape)
+    return noise
+
 # ================================================================
 # Inputs
 # ================================================================
@@ -344,7 +348,6 @@ def wndense(x, size, name, init_scale=1.0):
 
 
 def noisy_dense(x, size, name, weight_init=None, bias=True):
-
     # the function used in eq.7,8
     def f(x):
         return tf.multiply(tf.sign(x), tf.pow(tf.abs(x), 0.5))
@@ -356,8 +359,10 @@ def noisy_dense(x, size, name, weight_init=None, bias=True):
     # Sample noise from gaussian
     p = sample_noise([x.get_shape().as_list()[1], 1])
     q = sample_noise([1, size])
-    f_p = f(p); f_q = f(q)
-    w_epsilon = f_p*f_q; b_epsilon = tf.squeeze(f_q)
+    f_p = f(p); 
+    f_q = f(q)
+    w_epsilon = f_p * f_q; 
+    b_epsilon = tf.squeeze(f_q)
 
     # w = w_mu + w_sigma*w_epsilon
     w_mu = tf.get_variable(name + "/w_mu", [x.get_shape()[1], size], initializer=mu_init)

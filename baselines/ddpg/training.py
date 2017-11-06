@@ -193,7 +193,6 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, overwrite_
                 json.dump(combined_stats, logStats)
                 logF.flush()
                 logStats.flush()
-
             #    agent.save(path = os.path.abspath(logdir), name = agentName, overwrite = overwrite_memory)
                 agent.save(path = logdir, name = agentName, overwrite = overwrite_memory)
                 logger.info("agent {} saved".format(agent.itr.eval()))

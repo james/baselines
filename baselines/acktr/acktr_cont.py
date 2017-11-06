@@ -95,11 +95,13 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agen
             break
         logger.log("********** Iteration %i ************"%iters_so_far)
 
+        save_interval = 5
+
         # Collect paths until we have enough timesteps
         timesteps_this_batch = 0
         paths = []
         while True:
-            path = rollout(env, policy, max_pathlength, animate=(len(paths)==0 and (iters_so_far % 10 == 0) and animate), obfilter=obfilter)
+            path = rollout(env, policy, max_pathlength, animate=(len(paths)==0 and (iters_so_far % save_interval == 0) and animate), obfilter=obfilter)
             paths.append(path)
             n = pathlength(path)
             timesteps_this_batch += n
@@ -160,7 +162,6 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agen
         logF2.flush()
      #   logStats.flush()
 
-        save_interval = 2
         if save_interval and (iters_so_far % save_interval == 0 or iters_so_far == 1):
             saver.save(tf.get_default_session(), os.path.join(logdir, agentName), global_step=iters_so_far)
             ob_filter_path = os.path.join(os.path.abspath(logdir), "{}-{}".format('obfilter', iters_so_far))

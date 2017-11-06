@@ -12,14 +12,9 @@ class NeuralNetValueFunction(object):
         vtarg_n = tf.placeholder(tf.float32, shape=[None], name='vtarg')
         wd_dict = {}
 
-#        h1 = tf.nn.elu(dense(X, 400, "h1", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
-#        h2 = tf.nn.elu(dense(h1, 300, "h2", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
-#        h1 = tf.nn.elu(dense(X, 128, "h1", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
-#        h2 = tf.nn.elu(dense(h1, 128, "h2", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
-
         last_out = X
         for i in range(num_hid_layers):
-            last_out = tf.nn.elu(U.dense(last_out, hid_size, "vffc%i"%(i + 1), weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
+            last_out = tf.nn.selu(U.dense(last_out, hid_size, "vffc%i"%(i + 1), weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
         vpred_n = dense(last_out, 1, "hfinal", weight_init=None, bias_init=0, weight_loss_dict=wd_dict)[:,0]
 
         sample_vpred_n = vpred_n + tf.random_normal(tf.shape(vpred_n))

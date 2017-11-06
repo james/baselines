@@ -54,15 +54,9 @@ class GaussianMlpPolicy(object):
         oldlogprob_n = tf.placeholder(tf.float32, shape=[None], name='oldlogprob') # log probability of previous actions
         wd_dict = {}
 
-  #      h1 = tf.nn.tanh(dense(ob_no, 128, "h1", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
-  #      h2 = tf.nn.tanh(dense(h1, 128, "h2", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
-
-  #      h1 = tf.nn.elu(dense(ob_no, 400, "h1", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
-  #      h2 = tf.nn.elu(dense(h1, 300, "h2", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
-
         last_out = ob_no
         for i in range(num_hid_layers):
-            last_out = tf.nn.elu(U.dense(last_out, hid_size, "polfc%i"%(i + 1), weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+            last_out = tf.nn.selu(U.dense(last_out, hid_size, "polfc%i"%(i + 1), weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
         mean_na = dense(last_out, ac_dim, "mean", weight_init=U.normc_initializer(0.1), bias_init=0.0, weight_loss_dict=wd_dict) # Mean control output
 
         self.wd_dict = wd_dict

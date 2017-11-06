@@ -6,6 +6,8 @@ import tensorflow as tf
 import gym
 from gym import utils
 
+from gym_extensions.continuous import mujoco
+
 from baselines import logger
 from baselines.common import set_global_seeds
 from baselines import bench
@@ -90,7 +92,7 @@ if __name__ == "__main__":
     del args['portnum']
     del args['server_ip']
 
-    train(env='Humanoid-v1', num_timesteps=args['num_timesteps'],
+    train(args['env_id'], num_timesteps=args['num_timesteps'],
         timesteps_per_batch=args['timesteps_per_batch'],
         seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'],
         hid_size=args['hid_size'], num_hid_layers=args['num_hid_layers'],
