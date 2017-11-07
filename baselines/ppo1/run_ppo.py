@@ -2,6 +2,10 @@
 import argparse
 from baselines.common import set_global_seeds, tf_util as U
 from baselines import bench, logger
+from baselines.common.misc_util import (
+    set_global_seeds,
+    boolean_flag,
+)
 from baselines.common.mpi_fork import mpi_fork
 
 import os.path as osp
@@ -10,7 +14,6 @@ from mpi4py import MPI
 from gym import utils, spaces
 import numpy as np
 from numpy import Inf
-from baselines import logger
 
 import sys
 
@@ -324,9 +327,9 @@ class CustomParallelEnv:
         return
 
 def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
-          agentName, logdir, hid_size, num_hid_layers, noisy_nets, clip_param, 
+          agentName, logdir, hid_size, num_hid_layers, noisy_nets, clip_param,
           entcoeff, optim_epochs, optim_batchsize, optim_stepsize, optim_schedule,
-          gamma, lam, portnum, num_parallel
+          desired_kl, gamma, lam, portnum, num_parallel
 ):
     from baselines.ppo1 import mlp_policy, pposgd_parallel
     print("num cpu = " + str(num_cpu))
@@ -374,7 +377,7 @@ def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
         env.seed(seed)
 
     if logger.get_dir():
-        if num_parallel == 0:
+        if num_parallel <= 1:
             env = bench.Monitor(env, osp.join(logger.get_dir(), "monitor.json"))
 
     def policy_fn(name, ob_space, ac_space, noisy_nets=False):
@@ -387,19 +390,11 @@ def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
             timesteps_per_batch=timesteps_per_batch,
             clip_param=clip_param, entcoeff=entcoeff,
             optim_epochs=optim_epochs, optim_stepsize=optim_stepsize,
-            optim_batchsize=optim_batchsize,gamma=gamma, lam=lam,
-            schedule=optim_schedule, resume=resume,
+            optim_batchsize=optim_batchsize, schedule=optim_schedule,
+            desired_kl=desired_kl, gamma=gamma, lam=lam,
+            resume=resume, noisy_nets=noisy_nets,
             agentName=agentName, logdir=logdir,
-            noisy_nets=noisy_nets,
-            clip_param=clip_param, 
-            entcoeff=entcoeff,
-            optim_epochs=optim_epochs, 
-            optim_stepsize=optim_stepsize, 
-            optim_batchsize=optim_batchsize,
-            schedule=optim_schedule,
-            gamma=gamma, lam=lam, resume=resume, 
-            agentName=agentName, logdir=logdir, 
-            num_parallel=num_parallel
+            num_parallel=num_parallel, num_cpu=num_cpu
         )
     if num_parallel <= 1:
         env.close()
@@ -425,6 +420,7 @@ def parse_args():
     parser.add_argument('--optim_batchsize', type=int, default=64)
     parser.add_argument('--optim_stepsize', type=float, default=5e-4) # 3e-4 isefault for single agent training with constant schedule
     parser.add_argument('--optim_schedule', type=str, default='constant') # Other options: 'adaptive', 'linear'
+    parser.add_argument('--desired_kl', type=float, default=0.02)
 
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--lam', type=float, default=0.95)
@@ -452,10 +448,11 @@ def main():
     train(args['env_id'], num_timesteps=args['num_timesteps'], timesteps_per_batch=args['timesteps_per_batch'],
           seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'], agentName=args['agentName'], 
           logdir=args['logdir'], hid_size=args['hid_size'], num_hid_layers=args['num_hid_layers'],
-          noisy_nets=args[noisy_nets], clip_param=args['clip_param'], entcoeff=args['entcoeff'],
+          noisy_nets=args['noisy_nets'], clip_param=args['clip_param'], entcoeff=args['entcoeff'],
           optim_epochs=args['optim_epochs'], optim_batchsize=args['optim_batchsize'],
           optim_stepsize=args['optim_stepsize'], optim_schedule=args['optim_schedule'],
-          gamma=args['gamma'], lam=args['lam'], portnum=utils.portnum, num_parallel=args['num_parallel']
+          desired_kl=args['desired_kl'], gamma=args['gamma'], lam=args['lam'], 
+          portnum=utils.portnum, num_parallel=args['num_parallel']
           )
 
 

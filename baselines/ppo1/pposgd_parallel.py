@@ -272,10 +272,10 @@ def add_vtarg_and_adv(seg, gamma, lam, horizon, num_parallel, num_cpu):
 def learn(env, policy_func, *,
         timesteps_per_batch, # timesteps per actor per update
         clip_param, entcoeff, # clipping parameter epsilon, entropy coeff
-        optim_epochs, optim_stepsize, optim_batchsize,# optimization hypers
+        optim_epochs, optim_stepsize, optim_batchsize, # optimization hypers
         gamma, lam, # advantage estimation
-        max_timesteps=0, max_episodes=0, max_iters=0, max_seconds=0,  # time constraint
-        noisy_nets,
+        max_timesteps=0, max_episodes=0, max_iters=0, max_seconds=0, # time constraint
+        noisy_nets=False,
         callback=None, # you can do anything in the callback, since it takes locals(), globals()
         adam_epsilon=1e-5,
         schedule='constant', # annealing for stepsize parameters (epsilon and adam)

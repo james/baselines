@@ -25,21 +25,19 @@ class MlpPolicy(object):
         last_out = obz
 
         for i in range(num_hid_layers):
-            last_out = tf.nn.elu(U.dense(last_out, hid_size, "vffc%i"%(i + 1), weight_init=U.normc_initializer(1.0)))
+            last_out = tf.nn.selu(U.dense(last_out, hid_size, "vffc%i"%(i + 1), weight_init=U.normc_initializer(1.0)))
         self.vpred = U.dense(last_out, 1, "vffinal", weight_init=U.normc_initializer(1.0))[:,0]
         
         last_out = obz
         for i in range(num_hid_layers):
             if noisy_nets:
-                last_out = tf.nn.elu(U.noisy_dense(last_out, hid_size, "noisy_polfc%i"%(i + 1), weight_init=U.normc_initializer(1.0)))
+                last_out = tf.nn.selu(U.noisy_dense(last_out, hid_size, "noisy_polfc%i"%(i + 1), weight_init=U.normc_initializer(1.0)))
             else:
-                last_out = tf.nn.elu(U.dense(last_out, hid_size, "polfc%i"%(i + 1), weight_init=U.normc_initializer(1.0)))
+                last_out = tf.nn.selu(U.dense(last_out, hid_size, "polfc%i"%(i + 1), weight_init=U.normc_initializer(1.0)))
 
         if gaussian_fixed_var and isinstance(ac_space, gym.spaces.Box):
-            if noisy_nets:
-                mean = U.noisy_dense(last_out, pdtype.param_shape()[0]//2, "polfinal", U.normc_initializer(0.01))
-            else:
-                mean = U.dense(last_out, pdtype.param_shape()[0]//2, "polfinal", U.normc_initializer(0.01))
+            assert(noisy_nets)
+            mean = U.dense(last_out, pdtype.param_shape()[0]//2, "polfinal", U.normc_initializer(0.01))
             logstd = tf.get_variable(name="logstd", shape=[1, pdtype.param_shape()[0]//2], initializer=tf.zeros_initializer())
             pdparam = U.concatenate([mean, mean * 0.0 + logstd], axis=1)
         else:
