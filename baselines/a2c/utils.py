@@ -163,8 +163,11 @@ def linear(p):
     return 1-p
 
 schedules = {
+    'adaptive':adaptive,
+    'constant':constant,
     'linear':linear,
-    'constant':constant
+    'linear_clipped':linear_clipped,
+    'cyclic':cyclic
 }
 
 class Scheduler(object):

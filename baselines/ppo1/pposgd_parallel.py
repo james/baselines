@@ -279,6 +279,7 @@ def learn(env, policy_func, *,
         callback=None, # you can do anything in the callback, since it takes locals(), globals()
         adam_epsilon=1e-5,
         schedule='constant', # annealing for stepsize parameters (epsilon and adam)
+        desired_kl=0.02,
         logdir=".",
         agentName="PPO-Agent",
         resume = 0,
@@ -458,12 +459,12 @@ def learn(env, policy_func, *,
         elif max_seconds and time.time() - tstart >= max_seconds:
             break
 
-        if schedule == 'constant':
+        if schedule == 'adaptive' or 'constant':
             cur_lrmult = 1.0
         elif schedule == 'linear':
             cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0.0)
-        elif schedule == 'linear_reduced':
-            cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0.1)
+        elif schedule == 'linear_clipped':
+            cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0.2)
         elif schedule == 'cyclic':
         #    cur_lrmult =  max(1.0 - float(timesteps_so_far) / max_timesteps, 0)
             raise NotImplementedError
@@ -497,6 +498,15 @@ def learn(env, policy_func, *,
             losses = [] # list of tuples, each of which gives the loss for a minibatch
             for batch in d.iterate_once(optim_batchsize):
                 *newlosses, g = lossandgrad(batch["ob"], batch["ac"], batch["atarg"], batch["vtarg"], cur_lrmult)
+                if desired_kl != None and schedule == 'adaptive':
+                    if newlosses[-2] > desired_kl * 2.0:
+                        optim_stepsize = max(1e-8, optim_stepsize / 1.5)
+                        print('kl divergence was too large = ', newlosses[-2])
+                        print('New optim_stepsize = ', optim_stepsize)
+                    elif newlosses[-2] < desired_kl / 2.0:
+                        optim_stepsize = min(1e0, optim_stepsize * 1.5)
+                        print('kl divergence was too small = ', newlosses[-2])
+                        print('New optim_stepsize = ', optim_stepsize)
                 adam.update(g, optim_stepsize * cur_lrmult)
                 losses.append(newlosses)
             #print(str(losses))

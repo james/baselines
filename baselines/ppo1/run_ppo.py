@@ -409,14 +409,14 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--env-id', type=str, default='Custom0-v0')
     parser.add_argument('--num-cpu', type=int, default=1)
-    parser.add_argument('--seed', type=int, default=57)
-    parser.add_argument('--logdir', type=str, default='FetchRope') #default=None)
-    parser.add_argument('--agentName', type=str, default='FetchRope_256b')
+    parser.add_argument('--seed', type=int, default=7)
+    parser.add_argument('--logdir', type=str, default='Humanoid')
+    parser.add_argument('--agentName', type=str, default='Humanoid_128')
     parser.add_argument('--resume', type=int, default=0)
 
     parser.add_argument('--num_timesteps', type=int, default=1e7)
     parser.add_argument('--timesteps_per_batch', type=int, default=4096)
-    parser.add_argument('--hid_size', type=int, default=256)
+    parser.add_argument('--hid_size', type=int, default=128)
     parser.add_argument('--num_hid_layers', type=int, default=2)
     boolean_flag(parser, 'noisy_nets', default=False)
     parser.add_argument('--clip_param', type=float, default=0.2)
@@ -424,7 +424,7 @@ def parse_args():
     parser.add_argument('--optim_epochs', type=int, default=20)
     parser.add_argument('--optim_batchsize', type=int, default=64)
     parser.add_argument('--optim_stepsize', type=float, default=5e-4) # 3e-4 isefault for single agent training with constant schedule
-    parser.add_argument('--optim_schedule', type=str, default='linear_reduced') # Other options: 'constant', 'linear'
+    parser.add_argument('--optim_schedule', type=str, default='constant') # Other options: 'adaptive', 'linear'
 
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--lam', type=float, default=0.95)
