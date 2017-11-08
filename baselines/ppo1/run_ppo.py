@@ -98,7 +98,7 @@ class CustomParallelEnv:
         print ("Itr num = " + str(itrnum))
         itrnum = itrnum + 1
         if USE_ISAAC_COMM:
-            obs = self.isaac.Reset()
+            obs, _ = self.isaac.Reset()
             return obs
         else:
             if USE_BINARY_PROTO:
@@ -134,7 +134,7 @@ class CustomParallelEnv:
 
         #print('+++ Single-agent step')
         if USE_ISAAC_COMM:
-            obs, rew, die = self.isaac.Step(actions)
+            obs, rew, die, _ = self.isaac.Step(actions)
             return obs, rew, die, {}
         else:
             if USE_BINARY_PROTO:
@@ -216,7 +216,7 @@ class CustomParallelEnv:
         itrnum = itrnum + 1
 
         if USE_ISAAC_COMM:
-            obs = self.isaac.Reset()
+            obs, _ = self.isaac.Reset()
             return obs
         else:
             if USE_BINARY_PROTO:
@@ -252,7 +252,7 @@ class CustomParallelEnv:
 
     def step_parallel(self, actions):
         if USE_ISAAC_COMM:
-            obs, rew, die = self.isaac.Step(actions)
+            obs, rew, die, _ = self.isaac.Step(actions)
             return obs, rew, die, [{}] * self.n_parallel
         else:
             if USE_BINARY_PROTO:
