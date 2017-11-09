@@ -13,6 +13,7 @@ class IsaacClient:
         self.numActors = 0
         self.numObservations = 0
         self.numActions = 0
+        self.numExtras = 0
 
         if sys.platform == "win32":
             pluginName = 'IsaacClient.dll'
@@ -33,7 +34,8 @@ class IsaacClient:
             self.numActors = self.plugin.IsaacNumActors()
             self.numObservations = self.plugin.IsaacNumObservations()
             self.numActions = self.plugin.IsaacNumActions()
-
+            self.numExtras = self.plugin.IsaacNumExtras()
+		    
             #obs_buf_t = ctypes.POINTER(ctypes.c_float * self.numActors * self.numObservations)
 
             print('1')
@@ -45,6 +47,7 @@ class IsaacClient:
             self.plugin.IsaacGetObservations.restype = c_float_p
             self.plugin.IsaacGetRewards.restype = c_float_p
             self.plugin.IsaacGetDeaths.restype = c_byte_p
+            self.plugin.IsaacGetExtras.restype = c_float_p
 
             print('restype is', self.plugin.IsaacGetObservations.restype)
 
@@ -52,6 +55,7 @@ class IsaacClient:
             self.obsBuffer = self.plugin.IsaacGetObservations()
             self.rewBuffer = self.plugin.IsaacGetRewards()
             self.dieBuffer = self.plugin.IsaacGetDeaths()
+            self.extBuffer = self.plugin.IsaacGetExtras()
             print(self.obsBuffer)
             #print(np.ctypeslib.as_array(self.obsBuffer, shape=(self.numActors, self.numObservations)).reshape(self.numActors, self.numObservations))
             #print(np.frombuffer(ctypes.c_float * 3).from_address(self.plugin.IsaacGetObservations()), np.float32)
@@ -66,7 +70,7 @@ class IsaacClient:
 
     def Reset(self):
         if self.plugin.IsaacReset():
-            return np.ctypeslib.as_array(self.obsBuffer, shape=(self.numActors, self.numObservations))
+            return np.ctypeslib.as_array(self.obsBuffer, shape=(self.numActors, self.numObservations)), np.ctypeslib.as_array(self.extBuffer, shape=(self.numActors, self.numExtras))
         else:
             return None
 
@@ -75,6 +79,7 @@ class IsaacClient:
             obs = np.ctypeslib.as_array(self.obsBuffer, shape=(self.numActors, self.numObservations))
             rew = np.ctypeslib.as_array(self.rewBuffer, shape=(self.numActors,))
             die = np.ctypeslib.as_array(self.dieBuffer, shape=(self.numActors,))
-            return obs, rew, die
+            ext = np.ctypeslib.as_array(self.extBuffer, shape=(self.numActors, self.numExtras))
+            return obs, rew, die, ext
         else:
             return None
