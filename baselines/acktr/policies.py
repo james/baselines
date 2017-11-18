@@ -41,7 +41,7 @@ class CnnPolicy(object):
 
 
 class GaussianMlpPolicy(object):
-    def __init__(self, ob_dim, ac_dimhid_size, hid_size=128, num_hid_layers=2):
+    def __init__(self, ob_dim, ac_dim, hid_size=128, num_hid_layers=2):
         # Here we'll construct a bunch of expressions, which will be used in two places:
         # (1) When sampling actions
         # (2) When computing loss functions, for the policy update
@@ -56,7 +56,7 @@ class GaussianMlpPolicy(object):
 
         last_out = ob_no
         for i in range(num_hid_layers):
-            last_out = tf.nn.selu(U.dense(last_out, hid_size, "polfc%i"%(i + 1), weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+            last_out = tf.nn.selu(U.dense(last_out, hid_size, "polfc%i"%(i + 1), weight_init=U.normc_initializer(1.0))) # bias_init=0.0, weight_loss_dict=wd_dict
         mean_na = dense(last_out, ac_dim, "mean", weight_init=U.normc_initializer(0.1), bias_init=0.0, weight_loss_dict=wd_dict) # Mean control output
 
         self.wd_dict = wd_dict

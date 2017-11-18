@@ -1,26 +1,11 @@
-#!/usr/bin/env python
-import argparse
-from baselines.common import set_global_seeds, tf_util as U
-from baselines import bench, logger
-from baselines.common.misc_util import (
-    set_global_seeds,
-    boolean_flag,
-)
-from baselines.common.mpi_fork import mpi_fork
-
-import os.path as osp
+#import sys
 import gym, logging
 from mpi4py import MPI
 from gym import utils, spaces
 import numpy as np
 from numpy import Inf
-
-import sys
-
 import zmq
-from baselines.common.isaac_client import IsaacClient
-from baselines.common.custom_env import Custom0Env
-# from baselines.common.parallel_env import CustomParallelEnv
+from isaac_client import IsaacClient
 
 USE_ISAAC_COMM = True
 USE_BINARY_PROTO = False
@@ -51,7 +36,7 @@ class CustomParallelEnv:
             print(("portnum is " + utils.portnum))
             print("Connecting to environment server")
             self.socket = self.context.socket(zmq.REQ)
-            self.socket.connect("tcp://"+utils.server_ip+":" + utils.portnum)
+            self.socket.connect("tcp://" + utils.server_ip+":" + utils.portnum)
 
             if USE_BINARY_PROTO:
                 req = struct.pack('=Bi', 99, npar)
@@ -99,7 +84,7 @@ class CustomParallelEnv:
         print ("Itr num = " + str(itrnum))
         itrnum = itrnum + 1
         if USE_ISAAC_COMM:
-            obs, _ = self.isaac.Reset()
+            obs = self.isaac.Reset()
             return obs
         else:
             if USE_BINARY_PROTO:
@@ -132,10 +117,10 @@ class CustomParallelEnv:
                 return ss
 
     def step(self, actions):
-
         #print('+++ Single-agent step')
+
         if USE_ISAAC_COMM:
-            obs, rew, die, _ = self.isaac.Step(actions)
+            obs, rew, die = self.isaac.Step(actions)
             return obs, rew, die, {}
         else:
             if USE_BINARY_PROTO:
@@ -217,7 +202,7 @@ class CustomParallelEnv:
         itrnum = itrnum + 1
 
         if USE_ISAAC_COMM:
-            obs, _ = self.isaac.Reset()
+            obs = self.isaac.Reset()
             return obs
         else:
             if USE_BINARY_PROTO:
@@ -253,7 +238,7 @@ class CustomParallelEnv:
 
     def step_parallel(self, actions):
         if USE_ISAAC_COMM:
-            obs, rew, die, _ = self.isaac.Step(actions)
+            obs, rew, die = self.isaac.Step(actions)
             return obs, rew, die, [{}] * self.n_parallel
         else:
             if USE_BINARY_PROTO:
@@ -326,136 +311,3 @@ class CustomParallelEnv:
 
     def render(self):
         return
-
-def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
-          agentName, logdir, hid_size, num_hid_layers, noisy_nets, clip_param,
-          entcoeff, optim_epochs, optim_batchsize, optim_stepsize, optim_schedule,
-          desired_kl, gamma, lam, portnum, num_parallel
-):
-    from baselines.ppo1 import mlp_policy, pposgd_parallel
-    print("num cpu = " + str(num_cpu))
-    if (num_cpu > 1) and (num_parallel > 1):
-        print("num_cpu > 1 and num_parallel > 0 can't be used together at the moment!")
-        exit(0)
-
-    whoami  = mpi_fork(num_cpu)
-    if whoami == "parent": return
-    rank = MPI.COMM_WORLD.Get_rank()
-    sess = U.single_threaded_session()
-    sess.__enter__()
-
-    if rank != 0: logger.set_level(logger.DISABLED)
-    utils.portnum = portnum + rank
-    workerseed = seed + 10000 * rank
-
-    if utils.server_list != "":
-        servers = utils.server_list.split(",")
-        num_thread = utils.num_thread_list.split(",")
-        tmp = 0
-        a = 0
-        snum = -1
-        num_total = 0
-        for t in num_thread:
-            num_total += int(t)
-
-        for t in num_thread:
-            if rank < tmp + int(t):
-                snum = a
-                break
-            tmp += int(t)
-            a += 1
-        if num_total != num_cpu:
-            print("Sum of num_thread_list must be equal to num_cpu")
-            quit()
-        print("Connect to tcp://" + servers[snum] + ":" + str(utils.portnum))
-        utils.server_ip = servers[snum]
-
-    set_global_seeds(workerseed)
-    if num_parallel > 1:
-        env = CustomParallelEnv(num_parallel)
-    else:
-        env = gym.make(env_id)
-        env.seed(seed)
-
-    if logger.get_dir():
-        if num_parallel <= 1:
-            env = bench.Monitor(env, osp.join(logger.get_dir(), "monitor.json"))
-
-    def policy_fn(name, ob_space, ac_space, noisy_nets=False):
-        return mlp_policy.MlpPolicy(name=name, ob_space=ob_space, ac_space=ac_space,
-            hid_size=hid_size, num_hid_layers=num_hid_layers, noisy_nets=noisy_nets)
-
-    gym.logger.setLevel(logging.WARN)
-    pposgd_parallel.learn(env, policy_fn,
-            max_timesteps=num_timesteps,
-            timesteps_per_batch=timesteps_per_batch,
-            clip_param=clip_param, entcoeff=entcoeff,
-            optim_epochs=optim_epochs, optim_stepsize=optim_stepsize,
-            optim_batchsize=optim_batchsize, schedule=optim_schedule,
-            desired_kl=desired_kl, gamma=gamma, lam=lam,
-            resume=resume, noisy_nets=noisy_nets,
-            agentName=agentName, logdir=logdir,
-            num_parallel=num_parallel, num_cpu=num_cpu
-        )
-    if num_parallel <= 1:
-        env.close()
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--env-id', type=str, default='Custom0-v0')
-    parser.add_argument('--num-cpu', type=int, default=1)
-    parser.add_argument('--seed', type=int, default=7)
-    parser.add_argument('--logdir', type=str, default='Humanoid')
-    parser.add_argument('--agentName', type=str, default='Humanoid_128')
-    parser.add_argument('--resume', type=int, default=0)
-
-    parser.add_argument('--num_timesteps', type=int, default=1e7)
-    parser.add_argument('--timesteps_per_batch', type=int, default=4096)
-    parser.add_argument('--hid_size', type=int, default=128)
-    parser.add_argument('--num_hid_layers', type=int, default=2)
-    boolean_flag(parser, 'noisy_nets', default=False)
-    parser.add_argument('--clip_param', type=float, default=0.2)
-    parser.add_argument('--entcoeff', type=float, default=0.0)
-    parser.add_argument('--optim_epochs', type=int, default=20)
-    parser.add_argument('--optim_batchsize', type=int, default=64)
-    parser.add_argument('--optim_stepsize', type=float, default=5e-4) # 3e-4 isefault for single agent training with constant schedule
-    parser.add_argument('--optim_schedule', type=str, default='constant') # Other options: 'adaptive', 'linear'
-    parser.add_argument('--desired_kl', type=float, default=0.02)
-
-    parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--lam', type=float, default=0.95)
-
-    parser.add_argument('--portnum', required=False, type=int, default=5050)
-    parser.add_argument('--server_ip', required=False, default='localhost')
-    parser.add_argument('--num_parallel', type=int, default=0)
-    parser.add_argument('--server_list', required=False, type=str, default='')
-    parser.add_argument('--num_thread_list', required=False, type=str, default='') #Must either be "" or summed to num_cpu
-
-    return vars(parser.parse_args())
-
-def main():
-    args = parse_args()
-    utils.portnum = args['portnum']
-    utils.server_ip = args['server_ip']
-    utils.server_list = args['server_list']
-    utils.num_thread_list = args['num_thread_list']
-
-    del args['server_list']
-    del args['num_thread_list']
-    del args['portnum']
-    del args['server_ip']
-
-    train(args['env_id'], num_timesteps=args['num_timesteps'], timesteps_per_batch=args['timesteps_per_batch'],
-          seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'], agentName=args['agentName'], 
-          logdir=args['logdir'], hid_size=args['hid_size'], num_hid_layers=args['num_hid_layers'],
-          noisy_nets=args['noisy_nets'], clip_param=args['clip_param'], entcoeff=args['entcoeff'],
-          optim_epochs=args['optim_epochs'], optim_batchsize=args['optim_batchsize'],
-          optim_stepsize=args['optim_stepsize'], optim_schedule=args['optim_schedule'],
-          desired_kl=args['desired_kl'], gamma=args['gamma'], lam=args['lam'], 
-          portnum=utils.portnum, num_parallel=args['num_parallel']
-          )
-
-
-if __name__ == '__main__':
-    main()

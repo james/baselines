@@ -25,8 +25,8 @@ import gym
 import tensorflow as tf
 from mpi4py import MPI
 
-
-from custom_env import Custom0Env
+from baselines.common.custom_env import Custom0Env
+from baselines.common.parallel_env import CustomParallelEnv
 
 from gym.envs.registration import register
 

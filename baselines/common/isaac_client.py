@@ -20,10 +20,11 @@ class IsaacClient:
         else:
             pluginName = 'IsaacClient.so'
         pluginPath = os.path.join(pluginDir, pluginName)
-        if not os.path.isfile(pluginPath):
-            raise Exception('*** Plugin %s not found in directory %s' % (pluginName, os.path.abspath(pluginDir)))
+        print('Plugin path = ', pluginPath)
         print('Working directory:', os.getcwd())
         print('Loading plugin %s from directory %s' % (pluginName, os.path.abspath(pluginDir)))
+        if not os.path.isfile(pluginPath):
+            raise Exception('*** Plugin %s not found in directory %s' % (pluginName, os.path.abspath(pluginDir)))
         #self.plugin = ctypes.cdll.LoadLibrary(pluginPath)
         self.plugin = np.ctypeslib.load_library(pluginName, os.getcwd())
         #self.plugin.IsaacGetObservations.restype = ctypes.POINTER(ctypes.c_float)

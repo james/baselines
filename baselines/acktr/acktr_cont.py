@@ -86,6 +86,7 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agen
             print("Loaded observation filter")
     iters_so_far = resume
 
+    print ('logdir = ', logdir)
     logF = open(os.path.join(logdir, 'log.txt'), 'a')
     logF2 = open(os.path.join(logdir, 'log_it.txt'), 'a')
     logStats = open(os.path.join(logdir, 'log_stats.txt'), 'a')

@@ -15,18 +15,17 @@ from baselines.acktr.acktr_cont_parallel import learn
 from baselines.acktr.policies import GaussianMlpPolicy
 from baselines.acktr.value_functions import NeuralNetValueFunction
 
-#from parallel_env import CustomParallelEnv
+from baselines.common.custom_env import Custom0Env
+from baselines.common.parallel_env import CustomParallelEnv
 
-#from custom_env import Custom0Env
+from gym.envs.registration import register
 
-#from gym.envs.registration import register
-
-#register(
-#    id='Custom0-v0',
-#    entry_point='custom_env:Custom0Env',
-#    max_episode_steps=2000,
-#    reward_threshold=1000.0,
-#)
+register(
+    id='Custom0-v0',
+    entry_point='custom_env:Custom0Env',
+    max_episode_steps=2000,
+    reward_threshold=1000.0,
+)
 
 def train(env, num_timesteps, timesteps_per_batch, seed, num_cpu, resume, 
           hid_size, num_hid_layers, logdir, agentName, desired_kl, gamma, lam,
@@ -64,11 +63,11 @@ def parse_args():
     parser.add_argument('--env', type=str, default='Custom0-v0')
     parser.add_argument('--num-cpu', type=int, default=1)
     parser.add_argument('--seed', type=int, default=7)
-    parser.add_argument('--logdir', type=str, default=None)
+    parser.add_argument('--logdir', type=str, default='Humanoid')
     parser.add_argument('--agentName', type=str, default='Humanoid-ACKTR-256')
     parser.add_argument('--resume', type=int, default=0)
 
-    parser.add_argument('--hid_size', type=int, default=128)
+    parser.add_argument('--hid_size', type=int, default=256)
     parser.add_argument('--num_hid_layers', type=int, default=2)
 
     parser.add_argument('--num_timesteps', type=int, default=1e7)
@@ -96,7 +95,7 @@ if __name__ == "__main__":
         timesteps_per_batch=args['timesteps_per_batch'],
         seed=args['seed'], num_cpu=args['num_cpu'], resume=args['resume'],
         hid_size=args['hid_size'], num_hid_layers=args['num_hid_layers'],
-        logdir='Humanoid', agentName=args['agentName'],
+        logdir=args['logdir'], , agentName=args['agentName'],
         desired_kl=args['desired_kl'], gamma=args['gamma'], lam=args['lam'],
         portnum=utils.portnum, num_parallel=args['num_parallel']
         )

@@ -217,7 +217,7 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, agentName, l
                 pickle.dump(obfilter, ob_filter_output, pickle.HIGHEST_PROTOCOL)
 
 
-        if (save_interval and (iters_so_far % save_interval == 0 or iters_so_far == 1):
+        if (save_interval and (iters_so_far % save_interval == 0 or iters_so_far == 1)):
             saver.save(tf.get_default_session(), os.path.join(logdir, agentName), global_step=iters_so_far)
             ob_filter_path = os.path.join(os.path.abspath(logdir), "{}-{}".format('obfilter', iters_so_far))
             with open(ob_filter_path, 'wb') as ob_filter_output:
