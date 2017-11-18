@@ -130,16 +130,17 @@ class CnnPolicy(object):
         self.value = value
 
 class MlpPolicy(object):
-    def __init__(self, sess, ob_space, ac_space, nbatch, nsteps, reuse=False): #pylint: disable=W0613
+    def __init__(self, sess, ob_space, ac_space, nbatch, nsteps, size=128, reuse=False): #pylint: disable=W0613
         ob_shape = (nbatch,) + ob_space.shape
         actdim = ac_space.shape[0]
         X = tf.placeholder(tf.float32, ob_shape, name='Ob') #obs
         with tf.variable_scope("model", reuse=reuse):
-            h1 = fc(X, 'pi_fc1', nh=64, init_scale=np.sqrt(2), act=tf.tanh)
-            h2 = fc(h1, 'pi_fc2', nh=64, init_scale=np.sqrt(2), act=tf.tanh)
+            h1 = fc(X, 'pi_fc1', nh=size, init_scale=np.sqrt(2), act=tf.tanh)
+            h2 = fc(h1, 'pi_fc2', nh=size, init_scale=np.sqrt(2), act=tf.tanh)
             pi = fc(h2, 'pi', actdim, act=lambda x:x, init_scale=0.01)
-            h1 = fc(X, 'vf_fc1', nh=64, init_scale=np.sqrt(2), act=tf.tanh)
-            h2 = fc(h1, 'vf_fc2', nh=64, init_scale=np.sqrt(2), act=tf.tanh)
+            
+            h1 = fc(X, 'vf_fc1', nh=size, init_scale=np.sqrt(2), act=tf.tanh)
+            h2 = fc(h1, 'vf_fc2', nh=size, init_scale=np.sqrt(2), act=tf.tanh)
             vf = fc(h2, 'vf', 1, act=lambda x:x)[:,0]
             logstd = tf.get_variable(name="logstd", shape=[1, actdim], 
                 initializer=tf.zeros_initializer())
