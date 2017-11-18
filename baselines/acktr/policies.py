@@ -1,9 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from baselines.acktr.utils import conv, fc, dense, conv_to_fc, sample, kl_div
-from baselines.common.distributions import make_pdtype
 import baselines.common.tf_util as U
-import gym
 
 class CnnPolicy(object):
 
@@ -51,7 +49,6 @@ class GaussianMlpPolicy(object):
         oldac_na = tf.placeholder(tf.float32, shape=[None, ac_dim], name="ac") # batch of actions previous actions
         oldac_dist = tf.placeholder(tf.float32, shape=[None, ac_dim * 2], name="oldac_dist") # batch of actions previous action distributions
         adv_n = tf.placeholder(tf.float32, shape=[None], name="adv") # advantage function estimate
-        oldlogprob_n = tf.placeholder(tf.float32, shape=[None], name='oldlogprob') # log probability of previous actions
         wd_dict = {}
 
         last_out = ob_no

@@ -241,7 +241,7 @@ def check_shape(ts,shapes):
 def avg_norm(t):
     return tf.reduce_mean(tf.sqrt(tf.reduce_sum(tf.square(t), axis=-1)))
 
-def myadd(g1, g2, param):
+def gradient_add(g1, g2, param):
     print([g1, g2, param.name])
     assert (not (g1 is None and g2 is None)), param.name
     if g1 is None:
@@ -251,7 +251,7 @@ def myadd(g1, g2, param):
     else:
         return g1 + g2
 
-def my_explained_variance(qpred, q):
+def q_explained_variance(qpred, q):
     _, vary = tf.nn.moments(q, axes=[0, 1])
     _, varpred = tf.nn.moments(q - qpred, axes=[0, 1])
     check_shape([vary, varpred], [[]] * 2)

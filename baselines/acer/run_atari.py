@@ -3,10 +3,10 @@ import os, logging, gym
 from baselines import logger
 from baselines.common import set_global_seeds
 from baselines import bench
-from baselines.a2c.a2c import learn
+from baselines.acer.acer_simple import learn
 from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
-from baselines.a2c.policies import CnnPolicy, LstmPolicy, LnLstmPolicy
+from baselines.acer.policies import AcerCnnPolicy, AcerLstmPolicy
 
 def train(env_id, num_timesteps, seed, policy, lrschedule, num_cpu):
     def make_env(rank):
@@ -20,11 +20,12 @@ def train(env_id, num_timesteps, seed, policy, lrschedule, num_cpu):
     set_global_seeds(seed)
     env = SubprocVecEnv([make_env(i) for i in range(num_cpu)])
     if policy == 'cnn':
-        policy_fn = CnnPolicy
+        policy_fn = AcerCnnPolicy
     elif policy == 'lstm':
-        policy_fn = LstmPolicy
-    elif policy == 'lnlstm':
-        policy_fn = LnLstmPolicy
+        policy_fn = AcerLstmPolicy
+    else:
+        print("Policy {} not implemented".format(policy))
+        return
     learn(policy_fn, env, seed, total_timesteps=int(num_timesteps * 1.1), lrschedule=lrschedule)
     env.close()
 
@@ -35,11 +36,12 @@ def main():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--policy', help='Policy architecture', choices=['cnn', 'lstm', 'lnlstm'], default='cnn')
     parser.add_argument('--lrschedule', help='Learning rate schedule', choices=['constant', 'linear'], default='constant')
+    parser.add_argument('--logdir', help ='Directory for logging', default='./log')
     parser.add_argument('--num-timesteps', type=int, default=int(10e6))
     args = parser.parse_args()
-    logger.configure()
+    logger.configure(os.path.abspath(args.logdir))
     train(args.env, num_timesteps=args.num_timesteps, seed=args.seed,
-        policy=args.policy, lrschedule=args.lrschedule, num_cpu=16)
+          policy=args.policy, lrschedule=args.lrschedule, num_cpu=16)
 
 if __name__ == '__main__':
     main()

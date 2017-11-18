@@ -129,7 +129,6 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agen
         ob_no = np.concatenate([path["observation"] for path in paths])
         action_na = np.concatenate([path["action"] for path in paths])
         oldac_dist = np.concatenate([path["action_dist"] for path in paths])
-        logp_n = np.concatenate([path["logp"] for path in paths])
         adv_n = np.concatenate(advs)
         standardized_adv_n = (adv_n - adv_n.mean()) / (adv_n.std() + 1e-8)
 
@@ -173,3 +172,6 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, resume, logdir, agen
             callback()
         logger.dump_tabular()
         iters_so_far += 1
+
+    coord.request_stop()
+    coord.join(enqueue_threads)
