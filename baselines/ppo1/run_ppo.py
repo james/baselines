@@ -18,9 +18,12 @@ from numpy import Inf
 import sys
 
 import zmq
+#from baselines.common import IsaacClient, Custom0Env, CustomParallelEnv
 from baselines.common.isaac_client import IsaacClient
 from baselines.common.custom_env import Custom0Env
 # from baselines.common.parallel_env import CustomParallelEnv
+
+# from parallel_env import CustomParallelEnv
 
 USE_ISAAC_COMM = True
 USE_BINARY_PROTO = False
@@ -326,6 +329,7 @@ class CustomParallelEnv:
 
     def render(self):
         return
+
 
 def train(env_id, num_timesteps, timesteps_per_batch, seed, num_cpu, resume,
           agentName, logdir, hid_size, num_hid_layers, noisy_nets, clip_param,

@@ -9,7 +9,7 @@ c_byte_p    = ctypes.POINTER(ctypes.c_uint8)
 
 class IsaacClient:
     def __init__(self, pluginDir = '.'):
-
+        print('0')
         self.numActors = 0
         self.numObservations = 0
         self.numActions = 0

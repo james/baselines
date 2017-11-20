@@ -156,11 +156,20 @@ def find_trainable_variables(key):
 def make_path(f):
     return os.makedirs(f, exist_ok=True)
 
+def adaptive(p):
+    return 1.0
+
+def cyclic(p):
+    return 1.0
+
 def constant(p):
-    return 1
+    return 1.0
 
 def linear(p):
-    return 1-p
+    return 1.0 - p
+
+def linear_clipped(p):
+    return np.max(1.0 - p, 0.2)
 
 schedules = {
     'adaptive':adaptive,

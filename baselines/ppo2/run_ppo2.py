@@ -1,13 +1,18 @@
 #!/usr/bin/env python
 import argparse
 from baselines import bench, logger
-from baselines.common.isaac_client import IsaacClient
-from baselines.common.custom_env import Custom0Env
+from baselines.common import set_global_seeds, boolean_flag, tf_util as U
+
+# from baselines.common import IsaacClient, Custom0Env, CustomParallelEnv
+# from baselines.common import IsaacClient, Custom0Env
+from isaac_client import IsaacClient
+from gym import utils, spaces
+import numpy as np
+from numpy import Inf
 
 USE_ISAAC_COMM = True
 USE_BINARY_PROTO = False
 USE_COALESCED_ARRAYS = False
-
 
 class CustomVecEnvSpec:
     def __init__(self):
@@ -20,6 +25,7 @@ class CustomVecEnv:
 
         self.n_parallel = npar
         if USE_ISAAC_COMM:
+            print('-1')
             self.isaac = IsaacClient()
             if not self.isaac.Connect(npar):
                 print('*** Failed to connect to simulation server')
@@ -33,7 +39,7 @@ class CustomVecEnv:
             print(("portnum is " + utils.portnum))
             print("Connecting to environment server")
             self.socket = self.context.socket(zmq.REQ)
-            self.socket.connect("tcp://"+utils.server_ip+":" + utils.portnum)
+            self.socket.connect("tcp://" + utils.server_ip+":" + utils.portnum)
 
             if USE_BINARY_PROTO:
                 req = struct.pack('=Bi', 99, npar)
@@ -309,6 +315,30 @@ class CustomVecEnv:
     def render(self):
         return
 
+    def close(self):
+        return
+
+
+class VecEnv(object):
+    """
+    Vectorized environment base class
+    """
+    def step(self, vac):
+        """
+        Apply sequence of actions to sequence of environments
+        actions -> (observations, rewards, news)
+
+        where 'news' is a boolean vector indicating whether each element is new.
+        """
+        raise NotImplementedError
+    def reset(self):
+        """
+        Reset all environments
+        """
+        raise NotImplementedError
+    def close(self):
+        pass
+
 class CustomVecNormalize(VecEnv):
     """
     Vectorized environment base class
@@ -408,14 +438,14 @@ def test_runningmeanstd():
 
         assert np.allclose(ms1, ms2)    
 
-def train(env_id, num_timesteps, seed):
+def train(env_id, nenvs, num_timesteps, seed):
     from baselines.common import set_global_seeds
-    from baselines.common.vec_env.vec_normalize import VecNormalize
+  #  from baselines.common.vec_env.vec_normalize import VecNormalize
     from baselines.ppo2 import ppo2
     from baselines.ppo2.policies import MlpPolicy
     import gym
     import tensorflow as tf
-    from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
+   # from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
     ncpu = 1
     config = tf.ConfigProto(allow_soft_placement=True,
                             intra_op_parallelism_threads=ncpu,
@@ -425,27 +455,81 @@ def train(env_id, num_timesteps, seed):
         env = gym.make(env_id)
         env = bench.Monitor(env, logger.get_dir())
         return env
-    env = DummyVecEnv([make_env])
-    env = VecNormalize(env)
+#    env = DummyVecEnv([make_env])
+#    env = VecNormalize(env)
+
+    if nenvs > 1:
+        print("nenvs = ", nenvs)
+        env = CustomVecEnv(nenvs)
+    else:
+        env = gym.make(env_id)
+        env.seed(seed)
+
+    env = CustomVecNormalize(env)
 
     set_global_seeds(seed)
     policy = MlpPolicy
-    ppo2.learn(policy=policy, env=env, nsteps=2048, nminibatches=32,
+    ppo2.learn(policy=policy, env=env, nsteps=512, nminibatches=32,
         lam=0.95, gamma=0.99, noptepochs=10, log_interval=1,
         ent_coef=0.0,
-        lr=3e-4,
+        lr=5e-4,
         cliprange=0.2,
         total_timesteps=num_timesteps)
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--env-id', type=str, default='Custom0-v0')
+    parser.add_argument('--num-cpu', type=int, default=1)
+    parser.add_argument('--seed', type=int, default=7)
+    parser.add_argument('--logdir', type=str, default='Humanoid')
+    parser.add_argument('--agentName', type=str, default='Humanoid_128')
+    parser.add_argument('--resume', type=int, default=0)
+
+    parser.add_argument('--num_timesteps', type=int, default=1e7)
+    parser.add_argument('--timesteps_per_batch', type=int, default=4096)
+    parser.add_argument('--hid_size', type=int, default=128)
+    parser.add_argument('--num_hid_layers', type=int, default=2)
+    boolean_flag(parser, 'noisy_nets', default=False)
+    parser.add_argument('--clip_param', type=float, default=0.2)
+    parser.add_argument('--entcoeff', type=float, default=0.0)
+    parser.add_argument('--optim_epochs', type=int, default=20)
+    parser.add_argument('--optim_batchsize', type=int, default=64)
+    parser.add_argument('--optim_stepsize', type=float, default=5e-4) # 3e-4 isefault for single agent training with constant schedule
+    parser.add_argument('--optim_schedule', type=str, default='constant') # Other options: 'adaptive', 'linear'
+    parser.add_argument('--desired_kl', type=float, default=0.02)
+
+    parser.add_argument('--gamma', type=float, default=0.99)
+    parser.add_argument('--lam', type=float, default=0.95)
+
+    parser.add_argument('--portnum', required=False, type=int, default=5050)
+    parser.add_argument('--server_ip', required=False, default='localhost')
+    parser.add_argument('--num_parallel', type=int, default=0)
+    parser.add_argument('--server_list', required=False, type=str, default='')
+    parser.add_argument('--num_thread_list', required=False, type=str, default='') #Must either be "" or summed to num_cpu
+
+    return vars(parser.parse_args())
 
 def main():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--env', help='environment ID', default='Hopper-v1')
-    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
-    parser.add_argument('--num-timesteps', type=int, default=int(1e6))
-    args = parser.parse_args()
+#    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+#    parser.add_argument('--env', help='environment ID', default='Hopper-v1')
+#    parser.add_argument('--seed', help='RNG seed', type=int, default=0)
+#    parser.add_argument('--num-timesteps', type=int, default=int(1e6))
+#    args = parser.parse_args()
+    args = parse_args()
+    
+    utils.portnum = args['portnum']
+    utils.server_ip = args['server_ip']
+    utils.server_list = args['server_list']
+    utils.num_thread_list = args['num_thread_list']
+
+    del args['server_list']
+    del args['num_thread_list']
+    del args['portnum']
+    del args['server_ip']
+
     logger.configure()
-    train(args.env, num_timesteps=args.num_timesteps, seed=args.seed)
+ #   train(env_id='Custom1-v0', nenvs=args.num_parallel, num_timesteps=args.num_timesteps, seed=args.seed)
+    train(env_id='Custom0-v0', nenvs=250, num_timesteps=1e6, seed=7)
 
 
 if __name__ == '__main__':
