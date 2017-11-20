@@ -5,7 +5,8 @@ from gym import utils, spaces
 import numpy as np
 from numpy import Inf
 import zmq
-from isaac_client import IsaacClient
+from . import isaac_client
+#from isaac_client import IsaacClient
 
 USE_ISAAC_COMM = True
 USE_BINARY_PROTO = False
